@@ -1,0 +1,144 @@
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
+  </head>
+
+  <body style="margin: 0; overflow: hidden;">
+    <a-scene
+      vr-mode-ui="enabled: false"
+      loading-screen="enabled: false"
+      renderer="logarithmicDepthBuffer: true;"
+      embedded
+      arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
+      gesture-detector
+    >
+      <a-assets timeout="10000">
+        <a-asset-item id="animated-asset" src="assets/asset.glb"></a-asset-item>
+        <video id="ding-video" src="assets/ding.mp4" preload="auto" muted></video>
+        <audio id="page-flip-sound" src="assets/page-flip.mp3" preload="auto"></audio>
+      </a-assets>
+
+      <a-marker
+        id="animated-marker"
+        type="pattern"
+        preset="custom"
+        url="assets/marker.patt"
+        raycaster="objects: .clickable"
+        emitevents="true"
+        cursor="fuse: false; rayOrigin: mouse;"
+      >
+        <!-- 模型 -->
+        <a-entity
+          id="bowser-model"
+          gltf-model="#animated-asset"
+          animation-mixer="loop: repeat"
+          scale="1 1 1"
+          class="clickable"
+          gesture-handler
+        ></a-entity>
+
+        <!-- 影片 -->
+        <a-video
+          id="video-entity"
+          src="#ding-video"
+          position="0 0.5 -0.5"
+          scale="1 1 1"
+          autoplay
+          muted
+        ></a-video>
+
+        <!-- 電子書頁面 -->
+        <a-plane
+          id="book-page"
+          position="0 1.5 -1"
+          width="1.2"
+          height="0.9"
+          rotation="0 0 0"
+          material="src: assets/cover.jpg"
+          class="clickable"
+          animation__flip="property: rotation; dur: 500; startEvents: flip; from: 0 0 0; to: 0 180 0"
+        ></a-plane>
+
+        <!-- 翻頁按鈕 -->
+        <a-image
+          id="prev-button"
+          src="assets/left-arrow.png"
+          position="-0.8 1.5 -1"
+          width="0.2"
+          height="0.2"
+          class="clickable"
+        ></a-image>
+
+        <a-image
+          id="next-button"
+          src="assets/right-arrow.png"
+          position="0.8 1.5 -1"
+          width="0.2"
+          height="0.2"
+          class="clickable"
+        ></a-image>
+      </a-marker>
+
+      <a-entity camera cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
+    </a-scene>
+
+    <script>
+      // 翻頁邏輯
+      const pages = [
+        'assets/cover.jpg',
+        'assets/page2.jpg',
+        'assets/page3.jpg'
+      ];
+      let currentPage = 0;
+      const flipSound = document.querySelector('#page-flip-sound');
+
+      function updateBookPage() {
+        const page = document.querySelector("#book-page");
+        if (page) {
+          page.setAttribute('material', 'src', pages[currentPage]);
+          page.emit('flip');
+        }
+        if (flipSound) {
+          flipSound.currentTime = 0;
+          flipSound.play();
+        }
+      }
+
+      document.querySelector('#prev-button').addEventListener('click', () => {
+        currentPage = (currentPage - 1 + pages.length) % pages.length;
+        updateBookPage();
+      });
+
+      document.querySelector('#next-button').addEventListener('click', () => {
+        currentPage = (currentPage + 1) % pages.length;
+        updateBookPage();
+      });
+
+      // 影片播放控制
+      const marker = document.querySelector('#animated-marker');
+      marker.addEventListener('markerFound', () => {
+        const video = document.querySelector('#ding-video');
+        if (video) {
+          video.play();
+          video.muted = false;
+        }
+      });
+
+      marker.addEventListener('markerLost', () => {
+        const video = document.querySelector('#ding-video');
+        if (video) {
+          video.pause();
+          video.currentTime = 0;
+          video.muted = true;
+        }
+      });
+    </script>
+  </body>
+</html>
