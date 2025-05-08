@@ -19,17 +19,17 @@
       arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
       gesture-detector
     >
-      <a-assets timeout="10000">
-        <a-asset-item id="animated-asset" src="assets/asset.glb"></a-asset-item>
-        <video id="ding-video" src="assets/ding.mp4" preload="auto" muted></video>
-        <audio id="page-flip-sound" src="assets/page-flip.mp3" preload="auto"></audio>
-      </a-assets>
+      <a-eea timeout="10000">
+        <a-asset-item id="animated-asset" src="eea/asset.glb"></a-asset-item>
+        <video id="ding-video" src="eea/ding.mp4" preload="auto" muted></video>
+        <audio id="page-flip-sound" src="eea/page-flip.mp3" preload="auto"></audio>
+      </a-eea>
 
       <a-marker
         id="animated-marker"
         type="pattern"
         preset="custom"
-        url="assets/marker.patt"
+        url="eea/marker.patt"
         raycaster="objects: .clickable"
         emitevents="true"
         cursor="fuse: false; rayOrigin: mouse;"
@@ -61,7 +61,7 @@
           width="1.2"
           height="0.9"
           rotation="0 0 0"
-          material="src: assets/cover.jpg"
+          material="src: eea/cover.jpg"
           class="clickable"
           animation__flip="property: rotation; dur: 500; startEvents: flip; from: 0 0 0; to: 0 180 0"
         ></a-plane>
@@ -69,7 +69,7 @@
         <!-- 翻頁按鈕 -->
         <a-image
           id="prev-button"
-          src="assets/left-arrow.png"
+          src="eea/left-arrow.png"
           position="-0.8 1.5 -1"
           width="0.2"
           height="0.2"
@@ -78,7 +78,7 @@
 
         <a-image
           id="next-button"
-          src="assets/right-arrow.png"
+          src="eea/right-arrow.png"
           position="0.8 1.5 -1"
           width="0.2"
           height="0.2"
@@ -92,9 +92,9 @@
     <script>
       // 翻頁邏輯
       const pages = [
-        'assets/cover.jpg',
-        'assets/page2.jpg',
-        'assets/page3.jpg'
+        'eea/cover.jpg',
+        'eea/page2.jpg',
+        'eea/page3.jpg'
       ];
       let currentPage = 0;
       const flipSound = document.querySelector('#page-flip-sound');
