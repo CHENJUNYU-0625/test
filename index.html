@@ -18,11 +18,12 @@
       arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
       gesture-detector
     >
-      <a-eea timeout="10000">
+      <!-- 修正這裡：a-eea 改為 a-assets -->
+      <a-assets timeout="10000">
         <a-asset-item id="animated-asset" src="eea/asset.glb"></a-asset-item>
         <video id="ding-video" src="eea/ding.mp4" preload="auto" muted></video>
         <audio id="page-flip-sound" src="eea/page-flip.mp3" preload="auto"></audio>
-      </a-eea>
+      </a-assets>
 
       <a-marker
         id="animated-marker"
@@ -89,7 +90,6 @@
     </a-scene>
 
     <script>
-      // 翻頁邏輯
       const pages = [
         'eea/cover.jpg',
         'eea/page2.jpg',
@@ -120,7 +120,6 @@
         updateBookPage();
       });
 
-      // 影片播放控制
       const marker = document.querySelector('#animated-marker');
       marker.addEventListener('markerFound', () => {
         const video = document.querySelector('#ding-video');
