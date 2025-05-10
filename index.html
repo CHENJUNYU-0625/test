@@ -18,10 +18,18 @@
       arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
       gesture-detector
     >
-      <a-assets timeout="10000">
-        <a-asset-item id="animated-asset" src="eea/asset.glb"></a-asset-item>
+      <a-assets timeout="30000">
+        <!-- 預載所有資源 -->
+        <img id="cover" src="eea/cover.jpg">
+        <img id="page2" src="eea/page2.jpg">
+        <img id="page3" src="eea/page3.jpg">
         <video id="ding-video" src="eea/ding.mp4" preload="auto" muted></video>
+        <video id="video2" src="eea/video2.mp4" preload="auto" muted></video>
+        <video id="video3" src="eea/video3.mp4" preload="auto" muted></video>
         <audio id="page-flip-sound" src="eea/page-flip.mp3" preload="auto"></audio>
+        <a-asset-item id="model1" src="eea/asset.glb"></a-asset-item>
+        <a-asset-item id="model2" src="eea/model2.glb"></a-asset-item>
+        <a-asset-item id="model3" src="eea/model3.glb"></a-asset-item>
       </a-assets>
 
       <a-marker
@@ -34,13 +42,13 @@
         cursor="fuse: false; rayOrigin: mouse;"
         gesture-handler
       >
-        <!-- 模型 -->
+        <!-- 3D模型 -->
         <a-entity
-          id="bowser-model"
-          gltf-model="#animated-asset"
+          id="book-model"
+          gltf-model="#model1"
           animation-mixer="loop: repeat"
           scale="1 1 1"
-          class="clickable"
+          position="0 0 -0.5"
         ></a-entity>
 
         <!-- 影片 -->
@@ -60,9 +68,10 @@
           width="1.2"
           height="0.9"
           rotation="0 0 0"
-          material="src: eea/cover.jpg"
+          material="src: #cover"
           class="clickable"
           animation__flip="property: rotation; dur: 500; startEvents: flip; from: 0 0 0; to: 0 180 0"
+          animation__flipback="property: rotation; dur: 500; startEvents: flipback; from: 0 180 0; to: 0 0 0"
         ></a-plane>
 
         <!-- 翻頁按鈕 -->
@@ -73,6 +82,7 @@
           width="0.2"
           height="0.2"
           class="clickable"
+          events="click: prevPage"
         ></a-image>
 
         <a-image
@@ -82,45 +92,100 @@
           width="0.2"
           height="0.2"
           class="clickable"
+          events="click: nextPage"
         ></a-image>
       </a-marker>
 
-      <a-entity camera cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
+      <a-entity camera cursor="rayOrigin: mouse" raycaster="objects: .clickable; far: 5;"></a-entity>
     </a-scene>
 
     <script>
-      const pages = [
-        'eea/cover.jpg',
-        'eea/page2.jpg',
-        'eea/page3.jpg'
-      ];
+      // 頁面資源配置
+      const pages = ['#cover', '#page2', '#page3'];
+      const pageVideos = ['#ding-video', '#video2', '#video3'];
+      const pageModels = ['#model1', '#model2', '#model3'];
       let currentPage = 0;
-      const flipSound = document.querySelector('#page-flip-sound');
+      let isAnimating = false;
+
+      // 全局翻頁函數
+      window.prevPage = function() {
+        if (isAnimating) return;
+        currentPage = (currentPage - 1 + pages.length) % pages.length;
+        updateBookPage();
+      };
+
+      window.nextPage = function() {
+        if (isAnimating) return;
+        currentPage = (currentPage + 1) % pages.length;
+        updateBookPage();
+      };
 
       function updateBookPage() {
         const page = document.querySelector("#book-page");
-        if (page) {
-          page.setAttribute('material', 'src', pages[currentPage]);
-          page.emit('flip');
-        }
+        const video = document.querySelector("#ding-video");
+        const model = document.querySelector("#book-model");
+        
+        if (!page) return;
+
+        isAnimating = true;
+        
+        // 觸發翻頁動畫
+        page.emit('flip');
+        
+        // 播放翻頁音效
+        const flipSound = document.querySelector('#page-flip-sound');
         if (flipSound) {
           flipSound.currentTime = 0;
           flipSound.play();
         }
+
+        // 500ms後更新內容（與動畫時長匹配）
+        setTimeout(() => {
+          // 更新頁面材質
+          page.setAttribute('material', 'src', pages[currentPage]);
+          page.emit('flipback');
+          
+          // 更新影片
+          if (video) {
+            video.pause();
+            video.setAttribute('src', pageVideos[currentPage]);
+            video.load();
+            video.play();
+          }
+          
+          // 更新3D模型
+          if (model) {
+            model.setAttribute('gltf-model', pageModels[currentPage]);
+          }
+          
+          isAnimating = false;
+        }, 500);
       }
 
-      // 按鈕翻頁
-      document.querySelector('#prev-button').addEventListener('click', () => {
-        currentPage = (currentPage - 1 + pages.length) % pages.length;
-        updateBookPage();
+      // 滑動手勢支援
+      let touchStartX = 0;
+      const sceneEl = document.querySelector('a-scene');
+
+      sceneEl.addEventListener('touchstart', function(e) {
+        touchStartX = e.touches[0].clientX;
       });
 
-      document.querySelector('#next-button').addEventListener('click', () => {
-        currentPage = (currentPage + 1) % pages.length;
-        updateBookPage();
+      sceneEl.addEventListener('touchend', function(e) {
+        if (isAnimating) return;
+        
+        const touchEndX = e.changedTouches[0].clientX;
+        const deltaX = touchEndX - touchStartX;
+        
+        if (Math.abs(deltaX) > 50) { // 滑動閾值
+          if (deltaX > 0) {
+            prevPage(); // 向右滑→上一頁
+          } else {
+            nextPage(); // 向左滑→下一頁
+          }
+        }
       });
 
-      // 影片控制
+      // Marker檢測事件
       const marker = document.querySelector('#animated-marker');
       marker.addEventListener('markerFound', () => {
         const video = document.querySelector('#ding-video');
@@ -138,37 +203,6 @@
           video.muted = true;
         }
       });
-
-      // 觸控滑動支援
-      let touchStartX = 0;
-      let touchEndX = 0;
-
-      const sceneEl = document.querySelector('a-scene');
-
-      sceneEl.addEventListener('touchstart', function (e) {
-        touchStartX = e.changedTouches[0].screenX;
-      });
-
-      sceneEl.addEventListener('touchend', function (e) {
-        touchEndX = e.changedTouches[0].screenX;
-        handleSwipeGesture();
-      });
-
-      function handleSwipeGesture() {
-        const deltaX = touchEndX - touchStartX;
-
-        if (Math.abs(deltaX) < 30) return; // 忽略太短的滑動
-
-        if (deltaX < 0) {
-          // 向左滑動 → 下一頁
-          currentPage = (currentPage + 1) % pages.length;
-        } else {
-          // 向右滑動 → 上一頁
-          currentPage = (currentPage - 1 + pages.length) % pages.length;
-        }
-
-        updateBookPage();
-      }
     </script>
   </body>
 </html>
