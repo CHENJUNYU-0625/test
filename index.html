@@ -19,8 +19,8 @@
       gesture-detector
     >
       <a-assets timeout="10000">
-        <video id="ding-video" src="eea/ding.mp4" preload="auto" muted></video>
         <audio id="page-flip-sound" src="eea/page-flip.mp3" preload="auto"></audio>
+        <video id="dynamic-video" preload="auto" muted></video>
       </a-assets>
 
       <a-marker
@@ -30,35 +30,15 @@
         url="eea/marker.patt"
         raycaster="objects: .clickable"
         emitevents="true"
-        cursor="fuse: false; rayOrigin: cursor;"
+        cursor="fuse: false; rayOrigin: mouse;"
       >
-        <!-- 模型 -->
-        <a-entity
-          id="bowser-model"
-          gltf-model="eea/asset.glb"
-          animation-mixer="loop: repeat"
-          scale="1 1 1"
-          class="clickable"
-          gesture-handler
-        ></a-entity>
 
-        <!-- 影片 -->
-        <a-video
-          id="video-entity"
-          src="#ding-video"
-          position="0 0.5 -0.5"
-          scale="1 1 1"
-          autoplay
-          muted
-        ></a-video>
-
-        <!-- 電子書頁面 -->
+        <!-- 書頁圖片 -->
         <a-plane
           id="book-page"
           position="0 1.5 -1"
           width="1.2"
           height="0.9"
-          rotation="0 0 0"
           material="src: eea/cover.jpg"
           class="clickable"
           animation__flip="property: rotation; dur: 500; startEvents: flip; from: 0 0 0; to: 0 180 0"
@@ -72,7 +52,6 @@
           width="0.2"
           height="0.2"
           class="clickable"
-          events="click: prevPage">
         ></a-image>
 
         <a-image
@@ -82,69 +61,94 @@
           width="0.2"
           height="0.2"
           class="clickable"
-          events="click: nextPage">
         ></a-image>
+
+        <!-- 影片實體 -->
+        <a-video
+          id="video-entity"
+          src="#dynamic-video"
+          position="0 0.5 -0.5"
+          scale="1 1 1"
+          muted
+          autoplay
+        ></a-video>
+
+        <!-- 模型容器（會動態切換內容） -->
+        <a-entity
+          id="model-container"
+          position="0 0 0"
+          scale="1 1 1"
+          class="clickable"
+          gesture-handler
+        ></a-entity>
       </a-marker>
 
-      <a-entity camera
-                cursor="rayOrigin: cursor"
-                raycaster="objects: .clickable">
-      </a-entity>
+      <a-entity camera cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
     </a-scene>
 
     <script>
       const pages = [
-        'eea/cover.jpg',
-        'eea/page2.jpg',
-        'eea/page3.jpg'
-      ];
-      const pageVideos = [
-        'eea/ding.mp4',
-        'eea/video2.mp4',
-        'eea/video3.mp4'
-      ];
-      const pageModels = [
-        'eea/asset.glb',
-        'eea/model2.glb',
-        'eea/model3.glb'
+        {
+          image: 'eea/cover.jpg',
+          video: 'eea/ding.mp4',
+          model: 'eea/asset.glb'
+        },
+        {
+          image: 'eea/page2.jpg',
+          video: 'eea/video2.mp4',
+          model: 'eea/model2.glb'
+        },
+        {
+          image: 'eea/page3.jpg',
+          video: 'eea/video3.mp4',
+          model: 'eea/model3.glb'
+        }
       ];
 
       let currentPage = 0;
 
-      const flipSound = document.querySelector('#page-flip-sound');
-      const video = document.querySelector('#ding-video');
+      const bookPage = document.querySelector('#book-page');
+      const videoTag = document.querySelector('#dynamic-video');
       const videoEntity = document.querySelector('#video-entity');
-      const modelEntity = document.querySelector('#bowser-model');
+      const modelContainer = document.querySelector('#model-container');
+      const flipSound = document.querySelector('#page-flip-sound');
 
       function updateBookPage() {
-        const page = document.querySelector("#book-page");
-        if (page) {
-          page.setAttribute('material', 'src', pages[currentPage]);
-          page.emit('flip');
-        }
+        const pageData = pages[currentPage];
 
-        // 更新影片
-        if (video && videoEntity) {
-          video.pause();
-          video.setAttribute('src', pageVideos[currentPage]);
-          video.load();
-          video.play();
-          video.muted = false;
-          videoEntity.setAttribute('src', '#ding-video');
-        }
+        // 更新圖片
+        bookPage.setAttribute('material', 'src', pageData.image);
+        bookPage.emit('flip');
 
-        // 更新模型
-        if (modelEntity) {
-          modelEntity.setAttribute('gltf-model', pageModels[currentPage]);
-        }
-
-        // 翻頁聲音
+        // 翻頁聲
         if (flipSound) {
           flipSound.currentTime = 0;
           flipSound.play();
         }
+
+        // 更新影片
+        if (videoTag) {
+          videoTag.pause();
+          videoTag.setAttribute('src', pageData.video);
+          videoTag.load();
+          videoTag.play();
+          videoTag.muted = false;
+        }
+
+        // 更新模型
+        modelContainer.innerHTML = ''; // 移除舊模型
+        const model = document.createElement('a-entity');
+        model.setAttribute('gltf-model', pageData.model);
+        model.setAttribute('animation-mixer', 'loop: repeat');
+        model.setAttribute('scale', '1 1 1');
+        model.classList.add('clickable');
+        modelContainer.appendChild(model);
       }
 
+      // 初始頁載入
+      window.addEventListener('load', updateBookPage);
+
+      // 按鈕翻頁
       document.querySelector('#prev-button').addEventListener('click', () => {
         currentPage = (currentPage - 1 + pages.length) % pages.length;
         updateBookPage();
@@ -155,20 +159,20 @@
         updateBookPage();
       });
 
-      // 影片播放控制（根據 marker）
+      // Marker 控制影片播放
       const marker = document.querySelector('#animated-marker');
       marker.addEventListener('markerFound', () => {
-        if (video) {
-          video.play();
-          video.muted = false;
+        if (videoTag) {
+          videoTag.play();
+          videoTag.muted = false;
         }
       });
 
       marker.addEventListener('markerLost', () => {
-        if (video) {
-          video.pause();
-          video.currentTime = 0;
-          video.muted = true;
+        if (videoTag) {
+          videoTag.pause();
+          videoTag.currentTime = 0;
+          videoTag.muted = true;
         }
       });
     </script>
