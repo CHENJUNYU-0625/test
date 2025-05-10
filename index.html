@@ -30,7 +30,7 @@
         url="eea/marker.patt"
         raycaster="objects: .clickable"
         emitevents="true"
-        cursor="fuse: false; rayOrigin: mouse;"
+        cursor="fuse: false; rayOrigin: cursor;"
       >
         <!-- 模型 -->
         <a-entity
@@ -68,23 +68,28 @@
         <a-image
           id="prev-button"
           src="eea/left-arrow.png"
-          position="0.8 1.5 -1"
+          position="-0.8 1.5 -1"
           width="0.2"
           height="0.2"
           class="clickable"
+          gesture-handler
         ></a-image>
 
         <a-image
           id="next-button"
           src="eea/right-arrow.png"
-          position="-0.8 1.5 -1"
+          position="0.8 1.5 -1"
           width="0.2"
           height="0.2"
           class="clickable"
+          gesture-handler
         ></a-image>
       </a-marker>
 
-      <a-entity camera cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
+      <a-entity camera
+                cursor="rayOrigin: cursor"
+                raycaster="objects: .clickable">
+      </a-entity>
     </a-scene>
 
     <script>
