@@ -2,13 +2,32 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>AR 電子書</title>
+    <title>AR 電子書（滑動手勢翻頁）</title>
+    <meta name="viewport" content="width=device-width, user-scalable=no">
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.loaders.min.js"></script>
+    <style>
+      /* 可選：滑動提示箭頭 */
+      .swipe-indicator {
+        position: fixed;
+        top: 50%;
+        width: 48px;
+        opacity: 0;
+        transition: opacity 0.3s;
+        pointer-events: none;
+        z-index: 9999;
+      }
+      #left-swipe { left: 16px; }
+      #right-swipe { right: 16px; }
+    </style>
   </head>
 
   <body style="margin: 0; overflow: hidden;">
+    <!-- 滑動提示箭頭，可自行移除 -->
+    <img id="left-swipe" class="swipe-indicator" src="eea/left-arrow.png">
+    <img id="right-swipe" class="swipe-indicator" src="eea/right-arrow.png">
+
     <a-scene
       embedded
       arjs="sourceType: webcam; debugUIEnabled: false;"
@@ -83,6 +102,7 @@
     </a-scene>
 
     <script>
+      // 書頁資料
       const pages = [
         {
           image: 'eea/cover.jpg',
@@ -102,6 +122,7 @@
       ];
 
       let currentPage = 0;
+      let isAnimating = false;
 
       const bookPage = document.querySelector('#book-page');
       const videoElement = document.querySelector('#dynamic-video');
@@ -109,9 +130,10 @@
       const modelContainer = document.querySelector('#model-container');
       const flipSound = document.querySelector('#page-flip-sound');
       const marker = document.querySelector('#marker');
-
       const prevBtn = document.querySelector('#prev-button');
       const nextBtn = document.querySelector('#next-button');
+      const leftIndicator = document.getElementById('left-swipe');
+      const rightIndicator = document.getElementById('right-swipe');
 
       function updateBookPage() {
         const page = pages[currentPage];
@@ -124,9 +146,7 @@
         videoElement.pause();
         videoElement.setAttribute('src', page.video);
         videoElement.load();
-        videoElement.play().catch(() => {
-          // 瀏覽器未授權自動播放（可等 marker 出現時播放）
-        });
+        videoElement.play().catch(() => {});
 
         // 替換模型
         modelContainer.innerHTML = '';
@@ -145,23 +165,27 @@
       }
 
       function handleFlip(direction) {
+        if (isAnimating) return;
+        isAnimating = true;
         if (direction === 'prev') {
           currentPage = (currentPage - 1 + pages.length) % pages.length;
         } else {
           currentPage = (currentPage + 1) % pages.length;
         }
         updateBookPage();
+        setTimeout(() => { isAnimating = false; }, 350); // 動畫時長
       }
 
+      // 點擊按鈕翻頁
+      prevBtn.addEventListener('click', () => handleFlip('prev'));
+      nextBtn.addEventListener('click', () => handleFlip('next'));
+
+      // 按鈕點擊動畫（可選）
       function addClickFeedback(button) {
         button.addEventListener('mousedown', () => button.setAttribute('scale', '0.9 0.9 0.9'));
         button.addEventListener('mouseup', () => button.setAttribute('scale', '1 1 1'));
         button.addEventListener('mouseleave', () => button.setAttribute('scale', '1 1 1'));
       }
-
-      // 按鈕事件
-      prevBtn.addEventListener('click', () => handleFlip('prev'));
-      nextBtn.addEventListener('click', () => handleFlip('next'));
       addClickFeedback(prevBtn);
       addClickFeedback(nextBtn);
 
@@ -173,6 +197,81 @@
       marker.addEventListener('markerLost', () => {
         videoElement.pause();
         videoElement.currentTime = 0;
+      });
+
+      // 滑動手勢翻頁
+      let touchStartX = null;
+      let touchMoving = false;
+      const SWIPE_THRESHOLD = 50; // px
+
+      // 支援手機觸控
+      bookPage.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          touchStartX = e.touches[0].clientX;
+          touchMoving = true;
+        }
+      });
+      bookPage.addEventListener('touchmove', (e) => {
+        if (!touchMoving || e.touches.length !== 1) return;
+        const deltaX = e.touches[0].clientX - touchStartX;
+        if (deltaX > 10) {
+          leftIndicator.style.opacity = '0.5';
+          rightIndicator.style.opacity = '0';
+        } else if (deltaX < -10) {
+          rightIndicator.style.opacity = '0.5';
+          leftIndicator.style.opacity = '0';
+        } else {
+          leftIndicator.style.opacity = '0';
+          rightIndicator.style.opacity = '0';
+        }
+      });
+      bookPage.addEventListener('touchend', (e) => {
+        if (!touchMoving) return;
+        touchMoving = false;
+        leftIndicator.style.opacity = '0';
+        rightIndicator.style.opacity = '0';
+        const touchEndX = (e.changedTouches && e.changedTouches[0].clientX) || 0;
+        const deltaX = touchEndX - touchStartX;
+        if (Math.abs(deltaX) > SWIPE_THRESHOLD) {
+          handleFlip(deltaX > 0 ? 'prev' : 'next');
+        }
+      });
+
+      // 支援桌面滑鼠拖曳
+      let mouseDownX = null;
+      let mouseMoving = false;
+      bookPage.addEventListener('mousedown', (e) => {
+        mouseDownX = e.clientX;
+        mouseMoving = true;
+      });
+      bookPage.addEventListener('mousemove', (e) => {
+        if (!mouseMoving) return;
+        const deltaX = e.clientX - mouseDownX;
+        if (deltaX > 10) {
+          leftIndicator.style.opacity = '0.5';
+          rightIndicator.style.opacity = '0';
+        } else if (deltaX < -10) {
+          rightIndicator.style.opacity = '0.5';
+          leftIndicator.style.opacity = '0';
+        } else {
+          leftIndicator.style.opacity = '0';
+          rightIndicator.style.opacity = '0';
+        }
+      });
+      bookPage.addEventListener('mouseup', (e) => {
+        if (!mouseMoving) return;
+        mouseMoving = false;
+        leftIndicator.style.opacity = '0';
+        rightIndicator.style.opacity = '0';
+        const deltaX = e.clientX - mouseDownX;
+        if (Math.abs(deltaX) > SWIPE_THRESHOLD) {
+          handleFlip(deltaX > 0 ? 'prev' : 'next');
+        }
+      });
+      bookPage.addEventListener('mouseleave', () => {
+        mouseMoving = false;
+        leftIndicator.style.opacity = '0';
+        rightIndicator.style.opacity = '0';
       });
 
       // 初始載入
