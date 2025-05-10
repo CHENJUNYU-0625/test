@@ -1,26 +1,24 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8">
+    <title>AR 電子書</title>
     <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
   </head>
 
   <body style="margin: 0; overflow: hidden;">
     <a-scene
       vr-mode-ui="enabled: false"
       loading-screen="enabled: false"
-      renderer="logarithmicDepthBuffer: true;"
       embedded
+      renderer="logarithmicDepthBuffer: true;"
       arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
-      gesture-detector
     >
       <a-assets timeout="10000">
         <audio id="page-flip-sound" src="eea/page-flip.mp3" preload="auto"></audio>
-        <video id="dynamic-video" preload="auto" muted></video>
+        <video id="dynamic-video" preload="auto" crossorigin="anonymous" webkit-playsinline playsinline></video>
       </a-assets>
 
       <a-marker
@@ -32,19 +30,33 @@
         emitevents="true"
         cursor="fuse: false; rayOrigin: mouse;"
       >
+        <!-- 模型容器 -->
+        <a-entity id="model-container" position="0 0 0"></a-entity>
 
-        <!-- 書頁圖片 -->
+        <!-- 影片 -->
+        <a-video
+          id="video-entity"
+          src="#dynamic-video"
+          position="0 0.5 -0.5"
+          scale="1 1 1"
+          width="1.5"
+          height="0.9"
+          muted
+        ></a-video>
+
+        <!-- 電子書頁面 -->
         <a-plane
           id="book-page"
           position="0 1.5 -1"
           width="1.2"
           height="0.9"
+          rotation="0 0 0"
           material="src: eea/cover.jpg"
           class="clickable"
           animation__flip="property: rotation; dur: 500; startEvents: flip; from: 0 0 0; to: 0 180 0"
         ></a-plane>
 
-        <!-- 翻頁按鈕 -->
+        <!-- 左右翻頁按鈕 -->
         <a-image
           id="prev-button"
           src="eea/left-arrow.png"
@@ -62,27 +74,9 @@
           height="0.2"
           class="clickable"
         ></a-image>
-
-        <!-- 影片實體 -->
-        <a-video
-          id="video-entity"
-          src="#dynamic-video"
-          position="0 0.5 -0.5"
-          scale="1 1 1"
-          muted
-          autoplay
-        ></a-video>
-
-        <!-- 模型容器（會動態切換內容） -->
-        <a-entity
-          id="model-container"
-          position="0 0 0"
-          scale="1 1 1"
-          class="clickable"
-          gesture-handler
-        ></a-entity>
       </a-marker>
 
+      <!-- 相機 -->
       <a-entity camera cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
     </a-scene>
 
@@ -113,20 +107,17 @@
       const modelContainer = document.querySelector('#model-container');
       const flipSound = document.querySelector('#page-flip-sound');
 
+      const prevBtn = document.querySelector('#prev-button');
+      const nextBtn = document.querySelector('#next-button');
+
       function updateBookPage() {
         const pageData = pages[currentPage];
 
-        // 更新圖片
+        // 替換圖片
         bookPage.setAttribute('material', 'src', pageData.image);
         bookPage.emit('flip');
 
-        // 翻頁聲
-        if (flipSound) {
-          flipSound.currentTime = 0;
-          flipSound.play();
-        }
-
-        // 更新影片
+        // 替換影片
         if (videoTag) {
           videoTag.pause();
           videoTag.setAttribute('src', pageData.video);
@@ -135,31 +126,46 @@
           videoTag.muted = false;
         }
 
-        // 更新模型
-        modelContainer.innerHTML = ''; // 移除舊模型
+        // 替換模型
+        modelContainer.innerHTML = '';
         const model = document.createElement('a-entity');
         model.setAttribute('gltf-model', pageData.model);
         model.setAttribute('animation-mixer', 'loop: repeat');
         model.setAttribute('scale', '1 1 1');
         model.classList.add('clickable');
         modelContainer.appendChild(model);
+
+        // 翻頁音效
+        if (flipSound) {
+          flipSound.currentTime = 0;
+          flipSound.play();
+        }
       }
 
-      // 初始頁載入
-      window.addEventListener('load', updateBookPage);
-
-      // 按鈕翻頁
-      document.querySelector('#prev-button').addEventListener('click', () => {
-        currentPage = (currentPage - 1 + pages.length) % pages.length;
+      function handleButtonClick(direction) {
+        if (direction === 'prev') {
+          currentPage = (currentPage - 1 + pages.length) % pages.length;
+        } else {
+          currentPage = (currentPage + 1) % pages.length;
+        }
         updateBookPage();
-      });
+      }
 
-      document.querySelector('#next-button').addEventListener('click', () => {
-        currentPage = (currentPage + 1) % pages.length;
-        updateBookPage();
-      });
+      // 點擊效果（按下縮小，放開恢復）
+      function addClickEffect(el) {
+        el.addEventListener('mousedown', () => el.setAttribute('scale', '0.9 0.9 0.9'));
+        el.addEventListener('mouseup', () => el.setAttribute('scale', '1 1 1'));
+        el.addEventListener('mouseleave', () => el.setAttribute('scale', '1 1 1'));
+      }
 
-      // Marker 控制影片播放
+      // 加入事件
+      prevBtn.addEventListener('click', () => handleButtonClick('prev'));
+      nextBtn.addEventListener('click', () => handleButtonClick('next'));
+
+      addClickEffect(prevBtn);
+      addClickEffect(nextBtn);
+
+      // Marker 出現/消失 → 控制影片播放
       const marker = document.querySelector('#animated-marker');
       marker.addEventListener('markerFound', () => {
         if (videoTag) {
@@ -175,6 +181,9 @@
           videoTag.muted = true;
         }
       });
+
+      // 初始載入
+      window.addEventListener('load', updateBookPage);
     </script>
   </body>
 </html>
