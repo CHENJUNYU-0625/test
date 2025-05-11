@@ -39,7 +39,7 @@
         cursor="fuse: false; rayOrigin: mouse;"
         gesture-handler
       >
-        <!-- 模型 (初始縮小為0.5倍) -->
+        <!-- 模型 -->
         <a-entity
           id="bowser-model"
           gltf-model="#animated-asset"
@@ -80,101 +80,54 @@
         </a-entity>
 
         <!-- 翻頁按鈕 -->
-        <a-image
-          id="prev-button"
-          src="eea/left-arrow.png"
-          position="-0.8 1.5 -1"
-          width="0.2"
-          height="0.2"
-          class="clickable"
-        ></a-image>
+        <a-image id="prev-button" src="eea/left-arrow.png" position="-0.8 1.5 -0.95" width="0.2" height="0.2" transparent="true" class="clickable"></a-image>
+        <a-image id="next-button" src="eea/right-arrow.png" position="0.8 1.5 -0.95" width="0.2" height="0.2" transparent="true" class="clickable"></a-image>
 
-        <a-image
-          id="next-button"
-          src="eea/right-arrow.png"
-          position="0.8 1.5 -1"
-          width="0.2"
-          height="0.2"
-          class="clickable"
-        ></a-image>
+        <!-- 縮放按鈕 -->
+        <a-image id="zoom-in-button" src="#zoom-in-img" position="0.8 1.8 -0.95" width="0.15" height="0.15" transparent="true" class="clickable"></a-image>
+        <a-image id="zoom-out-button" src="#zoom-out-img" position="0.8 2.0 -0.95" width="0.15" height="0.15" transparent="true" class="clickable"></a-image>
 
-        <!-- 縮放控制按鈕 -->
-        <a-image
-          id="zoom-in-button"
-          src="#zoom-in-img"
-          position="0.8 1.8 -1"
-          width="0.15"
-          height="0.15"
-          class="clickable"
-        ></a-image>
-
-        <a-image
-          id="zoom-out-button"
-          src="#zoom-out-img"
-          position="0.8 2.0 -1"
-          width="0.15"
-          height="0.15"
-          class="clickable"
-        ></a-image>
+        <!-- 相機（移至 marker 內）-->
+        <a-entity camera position="0 0 0" cursor="rayOrigin: mouse" raycaster="objects: .clickable; far: 10"></a-entity>
       </a-marker>
-
-      <a-entity camera cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
     </a-scene>
 
     <script>
-      // 確保所有資源載入完成
       document.querySelector('a-scene').addEventListener('loaded', function() {
         initApp();
       });
 
       function initApp() {
-        const pages = [
-          '#cover',
-          '#page2',
-          '#page3'
-        ];
+        const pages = ['#cover', '#page2', '#page3'];
         let currentPage = 0;
         const flipSound = document.querySelector('#page-flip-sound');
         let isAnimating = false;
 
-        // 改進的翻頁函數
         function updateBookPage(direction) {
           if (isAnimating) return;
           isAnimating = true;
-          
           const frontPage = document.querySelector("#book-page-front");
           const backPage = document.querySelector("#book-page-back");
-          
-          // 設置背面頁面的內容
           const nextPage = (currentPage + direction + pages.length) % pages.length;
           backPage.setAttribute('material', 'src', pages[nextPage]);
-          
-          // 動畫參數
           const duration = 500;
-          
-          // 播放翻頁音效
+
           if (flipSound) {
             flipSound.currentTime = 0;
             flipSound.play().catch(e => console.log("Audio play failed:", e));
           }
-          
-          // 清除舊動畫
+
           frontPage.removeAttribute('animation');
           backPage.removeAttribute('animation');
-          
-          // 第一步：翻轉前頁
           frontPage.setAttribute('animation__flip', {
             property: 'rotation',
             to: `0 ${direction > 0 ? 180 : -180} 0`,
             dur: duration,
             easing: 'easeOutQuad'
           });
-          
-          // 顯示背面頁面
+
           setTimeout(() => {
             backPage.setAttribute('visible', 'true');
-            
-            // 第二步：翻轉後頁
             backPage.setAttribute('animation__flip', {
               property: 'rotation',
               from: `0 ${direction > 0 ? -180 : 180} 0`,
@@ -182,74 +135,62 @@
               dur: duration,
               easing: 'easeInQuad'
             });
-            
-            // 動畫完成後交換頁面
+
             setTimeout(() => {
               frontPage.setAttribute('material', 'src', pages[nextPage]);
               frontPage.setAttribute('rotation', '0 0 0');
               backPage.setAttribute('visible', 'false');
               backPage.removeAttribute('animation__flip');
               frontPage.removeAttribute('animation__flip');
-              
               currentPage = nextPage;
               isAnimating = false;
             }, duration);
-          }, duration/2);
+          }, duration / 2);
         }
 
-        // 按鈕翻頁 - 改進事件監聽
         function setupButtonListeners() {
-          document.querySelector('#prev-button').addEventListener('click', (e) => {
-            e.stopPropagation();
-            updateBookPage(-1);
-          });
+          const buttons = [
+            ['#prev-button', () => updateBookPage(-1)],
+            ['#next-button', () => updateBookPage(1)],
+            ['#zoom-in-button', () => zoomModel(0.1)],
+            ['#zoom-out-button', () => zoomModel(-0.1)]
+          ];
 
-          document.querySelector('#next-button').addEventListener('click', (e) => {
-            e.stopPropagation();
-            updateBookPage(1);
-          });
-
-          // 模型縮放控制
           const model = document.querySelector('#bowser-model');
-          const ZOOM_FACTOR = 0.1;
-          const MIN_SCALE = 0.2;
-          const MAX_SCALE = 2.0;
+          const MIN_SCALE = 0.2, MAX_SCALE = 2.0;
 
-          document.querySelector('#zoom-in-button').addEventListener('click', (e) => {
-            e.stopPropagation();
-            const currentScale = model.getAttribute('scale');
+          function zoomModel(delta) {
+            const scale = model.getAttribute('scale');
             const newScale = {
-              x: Math.min(currentScale.x + ZOOM_FACTOR, MAX_SCALE),
-              y: Math.min(currentScale.y + ZOOM_FACTOR, MAX_SCALE),
-              z: Math.min(currentScale.z + ZOOM_FACTOR, MAX_SCALE)
+              x: Math.min(Math.max(scale.x + delta, MIN_SCALE), MAX_SCALE),
+              y: Math.min(Math.max(scale.y + delta, MIN_SCALE), MAX_SCALE),
+              z: Math.min(Math.max(scale.z + delta, MIN_SCALE), MAX_SCALE)
             };
             model.setAttribute('scale', newScale);
-          });
+          }
 
-          document.querySelector('#zoom-out-button').addEventListener('click', (e) => {
-            e.stopPropagation();
-            const currentScale = model.getAttribute('scale');
-            const newScale = {
-              x: Math.max(currentScale.x - ZOOM_FACTOR, MIN_SCALE),
-              y: Math.max(currentScale.y - ZOOM_FACTOR, MIN_SCALE),
-              z: Math.max(currentScale.z - ZOOM_FACTOR, MIN_SCALE)
-            };
-            model.setAttribute('scale', newScale);
-          });
+          for (const [selector, handler] of buttons) {
+            const el = document.querySelector(selector);
+            el.addEventListener('click', (e) => {
+              e.stopPropagation();
+              handler();
+            });
+            el.addEventListener('touchend', (e) => {
+              e.stopPropagation();
+              handler();
+            });
+          }
         }
 
-        // 影片控制 - 改進標記偵測
         const marker = document.querySelector('#animated-marker');
         const video = document.querySelector('#ding-video');
-        
+
         marker.addEventListener('markerFound', () => {
           console.log("Marker found");
           if (video) {
             video.play().catch(e => console.log("Video play failed:", e));
             video.muted = false;
           }
-          
-          // 重置所有元素狀態
           document.querySelector('#book-page-front').setAttribute('rotation', '0 0 0');
           document.querySelector('#book-page-back').setAttribute('visible', 'false');
         });
@@ -263,42 +204,29 @@
           }
         });
 
-        // 觸控滑動支援 - 改進手勢檢測
-        let touchStartX = 0;
-        let touchEndX = 0;
-        let touchStartTime = 0;
-
+        let touchStartX = 0, touchEndX = 0, touchStartTime = 0;
         const sceneEl = document.querySelector('a-scene');
 
         sceneEl.addEventListener('touchstart', function (e) {
           touchStartX = e.changedTouches[0].screenX;
           touchStartTime = Date.now();
           e.preventDefault();
-        }, {passive: false});
+        }, { passive: false });
 
         sceneEl.addEventListener('touchend', function (e) {
           touchEndX = e.changedTouches[0].screenX;
           const deltaTime = Date.now() - touchStartTime;
-          
-          if (deltaTime < 500) { // 只處理短時間內的滑動
-            handleSwipeGesture();
-          }
+          if (deltaTime < 500) handleSwipeGesture();
           e.preventDefault();
-        }, {passive: false});
+        }, { passive: false });
 
         function handleSwipeGesture() {
           const deltaX = touchEndX - touchStartX;
-
-          if (Math.abs(deltaX) < 50) return; // 增加最小滑動距離
-
-          if (deltaX < 0) {
-            updateBookPage(1); // 向左滑動 → 下一頁
-          } else {
-            updateBookPage(-1); // 向右滑動 → 上一頁
-          }
+          if (Math.abs(deltaX) < 50) return;
+          if (deltaX < 0) updateBookPage(1);
+          else updateBookPage(-1);
         }
 
-        // 初始化按鈕監聽
         setupButtonListeners();
       }
     </script>
