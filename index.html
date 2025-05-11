@@ -2,6 +2,10 @@
 <html>
   <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- 禁用不必要的權限請求 -->
+    <meta name="vr-mode" content="no-vr-mode">
+    <meta name="ar" content="no-ar">
     <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
@@ -17,11 +21,15 @@
       embedded
       arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
       gesture-detector
+      device-orientation-permission-ui="enabled: false"
     >
       <a-assets timeout="10000">
         <a-asset-item id="animated-asset" src="eea/asset.glb"></a-asset-item>
         <video id="ding-video" src="eea/ding.mp4" preload="auto" muted></video>
         <audio id="page-flip-sound" src="eea/page-flip.mp3" preload="auto"></audio>
+        <img id="cover" src="eea/cover.jpg">
+        <img id="page2" src="eea/page2.jpg">
+        <img id="page3" src="eea/page3.jpg">
       </a-assets>
 
       <a-marker
@@ -34,12 +42,12 @@
         cursor="fuse: false; rayOrigin: mouse;"
         gesture-handler
       >
-        <!-- 模型 -->
+        <!-- 3D模型 -->
         <a-entity
           id="bowser-model"
           gltf-model="#animated-asset"
           animation-mixer="loop: repeat"
-          scale="1 1 1"
+          scale="0.5 0.5 0.5"
           class="clickable"
         ></a-entity>
 
@@ -49,7 +57,7 @@
           src="#ding-video"
           position="0 0.5 -0.5"
           scale="1 1 1"
-          autoplay
+          autoplay="false"
           muted
         ></a-video>
 
@@ -60,7 +68,7 @@
           width="1.2"
           height="0.9"
           rotation="0 0 0"
-          material="src: eea/cover.jpg"
+          material="src: #cover; side: double"
           class="clickable"
           animation__flip="property: rotation; dur: 500; startEvents: flip; from: 0 0 0; to: 0 180 0"
         ></a-plane>
@@ -89,86 +97,77 @@
     </a-scene>
 
     <script>
-      const pages = [
-        'eea/cover.jpg',
-        'eea/page2.jpg',
-        'eea/page3.jpg'
-      ];
-      let currentPage = 0;
-      const flipSound = document.querySelector('#page-flip-sound');
+      document.addEventListener('DOMContentLoaded', () => {
+        const pages = ['#cover', '#page2', '#page3'];
+        let currentPage = 0;
+        const flipSound = document.querySelector('#page-flip-sound');
 
-      function updateBookPage() {
-        const page = document.querySelector("#book-page");
-        if (page) {
-          page.setAttribute('material', 'src', pages[currentPage]);
-          page.emit('flip');
+        function updateBookPage() {
+          const page = document.querySelector("#book-page");
+          if (page) {
+            page.setAttribute('material', 'src', pages[currentPage]);
+            page.emit('flip');
+          }
+          if (flipSound) {
+            flipSound.currentTime = 0;
+            flipSound.play().catch(e => console.log("音效播放失敗:", e));
+          }
         }
-        if (flipSound) {
-          flipSound.currentTime = 0;
-          flipSound.play();
-        }
-      }
 
-      // 按鈕翻頁
-      document.querySelector('#prev-button').addEventListener('click', () => {
-        currentPage = (currentPage - 1 + pages.length) % pages.length;
-        updateBookPage();
-      });
-
-      document.querySelector('#next-button').addEventListener('click', () => {
-        currentPage = (currentPage + 1) % pages.length;
-        updateBookPage();
-      });
-
-      // 影片控制
-      const marker = document.querySelector('#animated-marker');
-      marker.addEventListener('markerFound', () => {
-        const video = document.querySelector('#ding-video');
-        if (video) {
-          video.play();
-          video.muted = false;
-        }
-      });
-
-      marker.addEventListener('markerLost', () => {
-        const video = document.querySelector('#ding-video');
-        if (video) {
-          video.pause();
-          video.currentTime = 0;
-          video.muted = true;
-        }
-      });
-
-      // 觸控滑動支援
-      let touchStartX = 0;
-      let touchEndX = 0;
-
-      const sceneEl = document.querySelector('a-scene');
-
-      sceneEl.addEventListener('touchstart', function (e) {
-        touchStartX = e.changedTouches[0].screenX;
-      });
-
-      sceneEl.addEventListener('touchend', function (e) {
-        touchEndX = e.changedTouches[0].screenX;
-        handleSwipeGesture();
-      });
-
-      function handleSwipeGesture() {
-        const deltaX = touchEndX - touchStartX;
-
-        if (Math.abs(deltaX) < 30) return; // 忽略太短的滑動
-
-        if (deltaX < 0) {
-          // 向左滑動 → 下一頁
-          currentPage = (currentPage + 1) % pages.length;
-        } else {
-          // 向右滑動 → 上一頁
+        // 按鈕翻頁
+        document.querySelector('#prev-button').addEventListener('click', (e) => {
+          e.stopPropagation();
           currentPage = (currentPage - 1 + pages.length) % pages.length;
-        }
+          updateBookPage();
+        });
 
-        updateBookPage();
-      }
+        document.querySelector('#next-button').addEventListener('click', (e) => {
+          e.stopPropagation();
+          currentPage = (currentPage + 1) % pages.length;
+          updateBookPage();
+        });
+
+        // 影片控制
+        const marker = document.querySelector('#animated-marker');
+        const video = document.querySelector('#ding-video');
+        
+        marker.addEventListener('markerFound', () => {
+          if (video) {
+            video.play().catch(e => console.log("影片播放失敗:", e));
+            video.muted = false;
+          }
+        });
+
+        marker.addEventListener('markerLost', () => {
+          if (video) {
+            video.pause();
+            video.currentTime = 0;
+            video.muted = true;
+          }
+        });
+
+        // 觸控滑動支援
+        let touchStartX = 0;
+        const sceneEl = document.querySelector('a-scene');
+
+        sceneEl.addEventListener('touchstart', (e) => {
+          touchStartX = e.changedTouches[0].screenX;
+        }, {passive: true});
+
+        sceneEl.addEventListener('touchend', (e) => {
+          const touchEndX = e.changedTouches[0].screenX;
+          const deltaX = touchEndX - touchStartX;
+
+          if (Math.abs(deltaX) < 30) return;
+
+          if (deltaX < 0) {
+            currentPage = (currentPage + 1) % pages.length;
+          } else {
+            currentPage = (currentPage - 1 + pages.length) % pages.length;
+          }
+          updateBookPage();
+        }, {passive: true});
+      });
     </script>
   </body>
 </html>
