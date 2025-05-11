@@ -22,6 +22,9 @@
         <a-asset-item id="animated-asset" src="eea/asset.glb"></a-asset-item>
         <video id="ding-video" src="eea/ding.mp4" preload="auto" muted></video>
         <audio id="page-flip-sound" src="eea/page-flip.mp3" preload="auto"></audio>
+        <img id="cover" src="eea/cover.jpg">
+        <img id="page2" src="eea/page2.jpg">
+        <img id="page3" src="eea/page3.jpg">
       </a-assets>
 
       <a-marker
@@ -54,16 +57,23 @@
         ></a-video>
 
         <!-- 電子書頁面 -->
-        <a-plane
-          id="book-page"
-          position="0 1.5 -1"
-          width="1.2"
-          height="0.9"
-          rotation="0 0 0"
-          material="src: eea/cover.jpg"
-          class="clickable"
-          animation__flip="property: rotation; dur: 500; startEvents: flip; from: 0 0 0; to: 0 180 0"
-        ></a-plane>
+        <a-entity id="book-container" position="0 1.5 -1">
+          <a-plane
+            id="book-page-front"
+            width="1.2"
+            height="0.9"
+            material="src: #cover"
+            class="clickable"
+          ></a-plane>
+          <a-plane
+            id="book-page-back"
+            width="1.2"
+            height="0.9"
+            rotation="0 180 0"
+            visible="false"
+            class="clickable"
+          ></a-plane>
+        </a-entity>
 
         <!-- 翻頁按鈕 -->
         <a-image
@@ -90,34 +100,78 @@
 
     <script>
       const pages = [
-        'eea/cover.jpg',
-        'eea/page2.jpg',
-        'eea/page3.jpg'
+        '#cover',
+        '#page2',
+        '#page3'
       ];
       let currentPage = 0;
       const flipSound = document.querySelector('#page-flip-sound');
+      let isAnimating = false;
 
-      function updateBookPage() {
-        const page = document.querySelector("#book-page");
-        if (page) {
-          page.setAttribute('material', 'src', pages[currentPage]);
-          page.emit('flip');
-        }
+      function updateBookPage(direction) {
+        if (isAnimating) return;
+        isAnimating = true;
+        
+        const frontPage = document.querySelector("#book-page-front");
+        const backPage = document.querySelector("#book-page-back");
+        
+        // 設置背面頁面的內容
+        const nextPage = (currentPage + direction + pages.length) % pages.length;
+        backPage.setAttribute('material', 'src', pages[nextPage]);
+        
+        // 動畫參數
+        const duration = 500;
+        const halfDuration = duration / 2;
+        
+        // 播放翻頁音效
         if (flipSound) {
           flipSound.currentTime = 0;
           flipSound.play();
         }
+        
+        // 第一步：翻轉前頁
+        frontPage.setAttribute('animation', {
+          property: 'rotation',
+          to: `0 ${direction > 0 ? 180 : -180} 0`,
+          dur: halfDuration,
+          easing: 'easeOutQuad'
+        });
+        
+        // 顯示背面頁面
+        setTimeout(() => {
+          backPage.setAttribute('visible', 'true');
+          
+          // 第二步：翻轉後頁
+          backPage.setAttribute('animation', {
+            property: 'rotation',
+            from: `0 ${direction > 0 ? -180 : 180} 0`,
+            to: '0 0 0',
+            dur: halfDuration,
+            easing: 'easeInQuad'
+          });
+          
+          // 動畫完成後交換頁面
+          setTimeout(() => {
+            // 交換前後頁面
+            frontPage.setAttribute('material', 'src', pages[nextPage]);
+            frontPage.setAttribute('rotation', '0 0 0');
+            backPage.setAttribute('visible', 'false');
+            backPage.removeAttribute('animation');
+            frontPage.removeAttribute('animation');
+            
+            currentPage = nextPage;
+            isAnimating = false;
+          }, halfDuration);
+        }, halfDuration);
       }
 
       // 按鈕翻頁
       document.querySelector('#prev-button').addEventListener('click', () => {
-        currentPage = (currentPage - 1 + pages.length) % pages.length;
-        updateBookPage();
+        updateBookPage(-1);
       });
 
       document.querySelector('#next-button').addEventListener('click', () => {
-        currentPage = (currentPage + 1) % pages.length;
-        updateBookPage();
+        updateBookPage(1);
       });
 
       // 影片控制
@@ -161,13 +215,11 @@
 
         if (deltaX < 0) {
           // 向左滑動 → 下一頁
-          currentPage = (currentPage + 1) % pages.length;
+          updateBookPage(1);
         } else {
           // 向右滑動 → 上一頁
-          currentPage = (currentPage - 1 + pages.length) % pages.length;
+          updateBookPage(-1);
         }
-
-        updateBookPage();
       }
     </script>
   </body>
