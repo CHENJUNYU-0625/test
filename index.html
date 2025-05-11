@@ -6,6 +6,7 @@
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aframe-gestures-component@1.1.8/dist/aframe-gestures-component.min.js"></script>
   </head>
   <body style="margin: 0; overflow: hidden">
     <a-scene
@@ -13,6 +14,7 @@
       arjs="sourceType: webcam; debugUIEnabled: false;"
       vr-mode-ui="enabled: false"
       renderer="logarithmicDepthBuffer: true;"
+      gestures="maxScale: 3; minScale: 0.3"
     >
       <a-assets>
         <audio id="flip-sound" src="eea/page-flip.mp3" preload="auto"></audio>
@@ -47,6 +49,14 @@
         <!-- 翻頁按鈕 -->
         <a-image id="prev" src="eea/left-arrow.png" position="-0.8 1.5 -1" width="0.2" height="0.2" class="clickable"></a-image>
         <a-image id="next" src="eea/right-arrow.png" position="0.8 1.5 -1" width="0.2" height="0.2" class="clickable"></a-image>
+        
+        <!-- 縮放控制按鈕 -->
+        <a-entity id="zoom-controls" position="0 -0.8 0">
+          <a-circle id="zoom-in" radius="0.1" position="-0.3 0 0" color="#4CAF50" class="clickable"></a-circle>
+          <a-text value="+" position="-0.3 0 0.01" align="center" color="white" width="1"></a-text>
+          <a-circle id="zoom-out" radius="0.1" position="0.3 0 0" color="#F44336" class="clickable"></a-circle>
+          <a-text value="-" position="0.3 0 0.01" align="center" color="white" width="1"></a-text>
+        </a-entity>
       </a-marker>
 
       <a-entity camera></a-entity>
@@ -72,6 +82,8 @@
       ];
 
       let currentPage = 0;
+      let currentModel = null;
+      let currentScale = 0.5;
       const videoEl = document.querySelector('#video-player');
       const pageEl = document.querySelector('#page');
       const videoPlane = document.querySelector('#video');
@@ -93,10 +105,11 @@
         while (modelEl.firstChild) modelEl.removeChild(modelEl.firstChild);
         const model = document.createElement('a-entity');
         model.setAttribute('gltf-model', data.model);
-        model.setAttribute('scale', '0.5 0.5 0.5');
-        model.setAttribute('gesture-detector', ''); // 用來支援縮放
+        model.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+        model.setAttribute('gesture-handler', 'minScale: 0.3; maxScale: 3');
         model.classList.add('clickable');
         modelEl.appendChild(model);
+        currentModel = model;
 
         if (flipSound) {
           flipSound.currentTime = 0;
@@ -104,6 +117,7 @@
         }
       };
 
+      // 翻頁功能
       document.querySelector('#next').addEventListener('click', () => {
         currentPage = (currentPage + 1) % pages.length;
         updatePage();
@@ -112,6 +126,21 @@
       document.querySelector('#prev').addEventListener('click', () => {
         currentPage = (currentPage - 1 + pages.length) % pages.length;
         updatePage();
+      });
+
+      // 縮放控制
+      document.querySelector('#zoom-in').addEventListener('click', () => {
+        if (currentModel) {
+          currentScale = Math.min(3, currentScale + 0.1);
+          currentModel.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+        }
+      });
+
+      document.querySelector('#zoom-out').addEventListener('click', () => {
+        if (currentModel) {
+          currentScale = Math.max(0.3, currentScale - 0.1);
+          currentModel.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+        }
       });
 
       // Marker 控制影片播放
@@ -126,24 +155,6 @@
 
       // 初始頁面載入
       window.addEventListener('load', updatePage);
-
-      // 手勢控制（支援 pinch 縮放、旋轉）
-      AFRAME.registerComponent('gesture-detector', {
-        init: function () {
-          const el = this.el;
-          let scale = 1;
-
-          el.sceneEl.addEventListener('onefingermove', function (event) {
-            el.object3D.rotation.y += event.detail.positionChange.x * 0.01;
-          });
-
-          el.sceneEl.addEventListener('twofingermove', function (event) {
-            scale += event.detail.spreadChange * 0.001;
-            scale = Math.max(0.1, Math.min(scale, 2));
-            el.setAttribute('scale', `${scale} ${scale} ${scale}`);
-          });
-        }
-      });
     </script>
   </body>
 </html>
