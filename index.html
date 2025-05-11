@@ -10,32 +10,12 @@
   </head>
 
   <body style="margin: 0; overflow: hidden;">
-    <!-- 啟動畫面 -->
-    <div id="start-screen" style="
-      position: absolute;
-      width: 100vw;
-      height: 100vh;
-      background: linear-gradient(to bottom, #111, #222);
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 2em;
-      z-index: 10;
-      cursor: pointer;
-    ">
-      🚀 點擊啟動 AR 電子書
-    </div>
-
-    <!-- AR 場景 -->
     <a-scene
-      id="scene"
-      style="display: none;"
       vr-mode-ui="enabled: false"
       loading-screen="enabled: false"
       renderer="logarithmicDepthBuffer: true;"
       embedded
-      arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
+      arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false; disableDefaultDeviceOrientation: true"
       gesture-detector
     >
       <a-assets timeout="30000">
@@ -59,7 +39,6 @@
         cursor="fuse: false; rayOrigin: mouse;"
         gesture-handler
       >
-        <!-- 模型 -->
         <a-entity
           id="bowser-model"
           gltf-model="#animated-asset"
@@ -69,7 +48,6 @@
           class="clickable"
         ></a-entity>
 
-        <!-- 影片 -->
         <a-video
           id="video-entity"
           src="#ding-video"
@@ -79,7 +57,6 @@
           muted
         ></a-video>
 
-        <!-- 電子書頁面 -->
         <a-entity id="book-container" position="0 1.5 -1">
           <a-plane
             id="book-page-front"
@@ -99,7 +76,6 @@
           ></a-plane>
         </a-entity>
 
-        <!-- 翻頁按鈕 -->
         <a-image
           id="prev-button"
           src="eea/left-arrow.png"
@@ -118,7 +94,6 @@
           class="clickable"
         ></a-image>
 
-        <!-- 縮放控制按鈕 -->
         <a-image
           id="zoom-in-button"
           src="#zoom-in-img"
@@ -142,19 +117,7 @@
     </a-scene>
 
     <script>
-      // 啟動 AR 的初始化：顯示場景並開始載入
-      function startAR() {
-        document.getElementById('start-screen').style.display = 'none';
-        document.getElementById('scene').style.display = 'block';
-      }
-
-      // 等待 DOM 準備好後綁定點擊事件
-      window.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('start-screen').addEventListener('click', startAR);
-      });
-
-      // 等待 A-Frame Scene 載入後開始初始化功能
-      document.querySelector('a-scene').addEventListener('loaded', function () {
+      document.querySelector('a-scene').addEventListener('loaded', function() {
         initApp();
       });
 
@@ -170,12 +133,10 @@
 
           const frontPage = document.querySelector("#book-page-front");
           const backPage = document.querySelector("#book-page-back");
-
           const nextPage = (currentPage + direction + pages.length) % pages.length;
           backPage.setAttribute('material', 'src', pages[nextPage]);
 
           const duration = 500;
-
           if (flipSound) {
             flipSound.currentTime = 0;
             flipSound.play().catch(e => console.log("Audio play failed:", e));
@@ -193,7 +154,6 @@
 
           setTimeout(() => {
             backPage.setAttribute('visible', 'true');
-
             backPage.setAttribute('animation__flip', {
               property: 'rotation',
               from: `0 ${direction > 0 ? -180 : 180} 0`,
@@ -208,7 +168,6 @@
               backPage.setAttribute('visible', 'false');
               backPage.removeAttribute('animation__flip');
               frontPage.removeAttribute('animation__flip');
-
               currentPage = nextPage;
               isAnimating = false;
             }, duration);
@@ -287,7 +246,7 @@
           touchStartX = e.changedTouches[0].screenX;
           touchStartTime = Date.now();
           e.preventDefault();
-        }, { passive: false });
+        }, {passive: false});
 
         sceneEl.addEventListener('touchend', function (e) {
           touchEndX = e.changedTouches[0].screenX;
@@ -297,12 +256,11 @@
             handleSwipeGesture();
           }
           e.preventDefault();
-        }, { passive: false });
+        }, {passive: false});
 
         function handleSwipeGesture() {
           const deltaX = touchEndX - touchStartX;
           if (Math.abs(deltaX) < 50) return;
-
           if (deltaX < 0) {
             updateBookPage(1);
           } else {
