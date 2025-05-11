@@ -1,199 +1,148 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="vr-mode" content="no-vr-mode">
-    <meta name="ar" content="no-ar">
-    <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-    <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
-    <style>
-      .zoom-controls {
-        position: absolute;
-        right: 20px;
-        top: 20px;
-        z-index: 9999;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-      .zoom-btn {
-        width: 40px;
-        height: 40px;
-        background: rgba(255,255,255,0.7);
-        border-radius: 50%;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        font-size: 24px;
-        cursor: pointer;
-        user-select: none;
-      }
-    </style>
+    <title>WebAR 電子書</title>
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
   </head>
-
-  <body style="margin: 0; overflow: hidden;">
-    <!-- 新增HTML縮放控制按鈕 -->
-    <div class="zoom-controls">
-      <div id="zoom-in-btn" class="zoom-btn">+</div>
-      <div id="zoom-out-btn" class="zoom-btn">-</div>
-    </div>
-
+  <body style="margin: 0; overflow: hidden">
     <a-scene
-      vr-mode-ui="enabled: false"
-      loading-screen="enabled: false"
-      renderer="logarithmicDepthBuffer: true;"
       embedded
-      arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
-      gesture-detector
-      device-orientation-permission-ui="enabled: false"
+      arjs="sourceType: webcam; debugUIEnabled: false;"
+      vr-mode-ui="enabled: false"
+      renderer="logarithmicDepthBuffer: true;"
     >
-      <a-assets timeout="10000">
-        <a-asset-item id="animated-asset" src="eea/asset.glb"></a-asset-item>
-        <video id="ding-video" src="eea/ding.mp4" preload="auto" muted></video>
-        <audio id="page-flip-sound" src="eea/page-flip.mp3" preload="auto"></audio>
-        <img id="cover" src="eea/cover.jpg">
-        <img id="page2" src="eea/page2.jpg">
-        <img id="page3" src="eea/page3.jpg">
+      <a-assets>
+        <audio id="flip-sound" src="eea/page-flip.mp3" preload="auto"></audio>
+        <video id="video-player" preload="auto" webkit-playsinline playsinline crossorigin="anonymous"></video>
       </a-assets>
 
       <a-marker
-        id="animated-marker"
+        id="book-marker"
         type="pattern"
-        preset="custom"
         url="eea/marker.patt"
         raycaster="objects: .clickable"
+        cursor="rayOrigin: mouse"
         emitevents="true"
-        cursor="fuse: false; rayOrigin: mouse;"
-        gesture-handler
       >
-        <!-- 3D模型 (初始縮小為0.3倍) -->
-        <a-entity
-          id="bowser-model"
-          gltf-model="#animated-asset"
-          animation-mixer="loop: repeat"
-          scale="0.3 0.3 0.3"
-          gesture-handler="minScale: 0.1; maxScale: 3"
-          class="clickable"
-        ></a-entity>
+        <!-- 書頁 -->
+        <a-plane id="page" position="0 1.5 -1" width="1.2" height="0.9"></a-plane>
 
-        <!-- 其他元素保持不變 -->
-        <a-video id="video-entity" src="#ding-video" position="0 0.5 -0.5" scale="1 1 1" autoplay="false" muted></a-video>
-        <a-plane id="book-page" position="0 1.5 -1" width="1.2" height="0.9" rotation="0 0 0" material="src: #cover; side: double" class="clickable"></a-plane>
-        <a-image id="prev-button" src="eea/left-arrow.png" position="-0.8 1.5 -1" width="0.2" height="0.2" class="clickable"></a-image>
-        <a-image id="next-button" src="eea/right-arrow.png" position="0.8 1.5 -1" width="0.2" height="0.2" class="clickable"></a-image>
+        <!-- 影片 -->
+        <a-video
+          id="video"
+          src="#video-player"
+          position="0 0.5 -0.5"
+          width="1.4"
+          height="0.8"
+          scale="1 1 1"
+          muted
+        ></a-video>
+
+        <!-- 模型容器 -->
+        <a-entity id="model" position="0 0 0" class="clickable"></a-entity>
+
+        <!-- 翻頁按鈕 -->
+        <a-image id="prev" src="eea/left-arrow.png" position="-0.8 1.5 -1" width="0.2" height="0.2" class="clickable"></a-image>
+        <a-image id="next" src="eea/right-arrow.png" position="0.8 1.5 -1" width="0.2" height="0.2" class="clickable"></a-image>
       </a-marker>
 
-      <a-entity camera cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
+      <a-entity camera></a-entity>
     </a-scene>
 
     <script>
-      document.addEventListener('DOMContentLoaded', () => {
-        const pages = ['#cover', '#page2', '#page3'];
-        let currentPage = 0;
-        const flipSound = document.querySelector('#page-flip-sound');
-        const model = document.querySelector('#bowser-model');
-
-        // 縮放控制參數
-        const ZOOM_FACTOR = 0.1;
-        const MIN_SCALE = 0.1;
-        const MAX_SCALE = 3.0;
-        let currentScale = 0.3; // 初始縮放值
-
-        // 初始化模型縮放
-        model.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
-
-        // 翻頁功能
-        function updateBookPage() {
-          const page = document.querySelector("#book-page");
-          if (page) {
-            page.setAttribute('material', 'src', pages[currentPage]);
-            // 添加翻頁動畫
-            page.setAttribute('animation', {
-              property: 'rotation',
-              from: '0 0 0',
-              to: '0 180 0',
-              dur: 500,
-              easing: 'easeInOutQuad'
-            });
-            setTimeout(() => {
-              page.setAttribute('rotation', '0 0 0');
-              page.removeAttribute('animation');
-            }, 500);
-          }
-          if (flipSound) {
-            flipSound.currentTime = 0;
-            flipSound.play().catch(e => console.log("音效播放失敗:", e));
-          }
+      const pages = [
+        {
+          image: 'eea/cover.jpg',
+          video: 'eea/ding.mp4',
+          model: 'eea/asset.glb'
+        },
+        {
+          image: 'eea/page2.jpg',
+          video: 'eea/video2.mp4',
+          model: 'eea/model2.glb'
+        },
+        {
+          image: 'eea/cover.jpg',
+          video: 'eea/video3.mp4',
+          model: 'eea/model3.glb'
         }
+      ];
 
-        // 翻頁按鈕
-        document.querySelector('#prev-button').addEventListener('click', (e) => {
-          e.stopPropagation();
-          currentPage = (currentPage - 1 + pages.length) % pages.length;
-          updateBookPage();
-        });
+      let currentPage = 0;
+      const videoEl = document.querySelector('#video-player');
+      const pageEl = document.querySelector('#page');
+      const videoPlane = document.querySelector('#video');
+      const modelEl = document.querySelector('#model');
+      const flipSound = document.querySelector('#flip-sound');
 
-        document.querySelector('#next-button').addEventListener('click', (e) => {
-          e.stopPropagation();
-          currentPage = (currentPage + 1) % pages.length;
-          updateBookPage();
-        });
+      const updatePage = () => {
+        const data = pages[currentPage];
 
-        // 縮放控制功能
-        document.querySelector('#zoom-in-btn').addEventListener('click', () => {
-          currentScale = Math.min(currentScale + ZOOM_FACTOR, MAX_SCALE);
-          model.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
-        });
+        // 替換書頁圖
+        pageEl.setAttribute('material', `src: ${data.image}`);
 
-        document.querySelector('#zoom-out-btn').addEventListener('click', () => {
-          currentScale = Math.max(currentScale - ZOOM_FACTOR, MIN_SCALE);
-          model.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
-        });
+        // 替換影片
+        videoEl.pause();
+        videoEl.setAttribute('src', data.video);
+        videoEl.load();
 
-        // 影片控制
-        const marker = document.querySelector('#animated-marker');
-        const video = document.querySelector('#ding-video');
-        
-        marker.addEventListener('markerFound', () => {
-          if (video) {
-            video.play().catch(e => console.log("影片播放失敗:", e));
-            video.muted = false;
-          }
-        });
+        // 替換模型
+        while (modelEl.firstChild) modelEl.removeChild(modelEl.firstChild);
+        const model = document.createElement('a-entity');
+        model.setAttribute('gltf-model', data.model);
+        model.setAttribute('scale', '0.5 0.5 0.5');
+        model.setAttribute('gesture-detector', ''); // 用來支援縮放
+        model.classList.add('clickable');
+        modelEl.appendChild(model);
 
-        marker.addEventListener('markerLost', () => {
-          if (video) {
-            video.pause();
-            video.currentTime = 0;
-            video.muted = true;
-          }
-        });
+        if (flipSound) {
+          flipSound.currentTime = 0;
+          flipSound.play();
+        }
+      };
 
-        // 觸控滑動支援
-        let touchStartX = 0;
-        const sceneEl = document.querySelector('a-scene');
+      document.querySelector('#next').addEventListener('click', () => {
+        currentPage = (currentPage + 1) % pages.length;
+        updatePage();
+      });
 
-        sceneEl.addEventListener('touchstart', (e) => {
-          touchStartX = e.changedTouches[0].screenX;
-        }, {passive: true});
+      document.querySelector('#prev').addEventListener('click', () => {
+        currentPage = (currentPage - 1 + pages.length) % pages.length;
+        updatePage();
+      });
 
-        sceneEl.addEventListener('touchend', (e) => {
-          const touchEndX = e.changedTouches[0].screenX;
-          const deltaX = touchEndX - touchStartX;
+      // Marker 控制影片播放
+      const marker = document.querySelector('#book-marker');
+      marker.addEventListener('markerFound', () => {
+        videoEl.play();
+      });
+      marker.addEventListener('markerLost', () => {
+        videoEl.pause();
+        videoEl.currentTime = 0;
+      });
 
-          if (Math.abs(deltaX) < 30) return;
+      // 初始頁面載入
+      window.addEventListener('load', updatePage);
 
-          if (deltaX < 0) {
-            currentPage = (currentPage + 1) % pages.length;
-          } else {
-            currentPage = (currentPage - 1 + pages.length) % pages.length;
-          }
-          updateBookPage();
-        }, {passive: true});
+      // 手勢控制（支援 pinch 縮放、旋轉）
+      AFRAME.registerComponent('gesture-detector', {
+        init: function () {
+          const el = this.el;
+          let scale = 1;
+
+          el.sceneEl.addEventListener('onefingermove', function (event) {
+            el.object3D.rotation.y += event.detail.positionChange.x * 0.01;
+          });
+
+          el.sceneEl.addEventListener('twofingermove', function (event) {
+            scale += event.detail.spreadChange * 0.001;
+            scale = Math.max(0.1, Math.min(scale, 2));
+            el.setAttribute('scale', `${scale} ${scale} ${scale}`);
+          });
+        }
       });
     </script>
   </body>
