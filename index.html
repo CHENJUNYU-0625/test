@@ -25,6 +25,8 @@
         <img id="cover" src="eea/cover.jpg">
         <img id="page2" src="eea/page2.jpg">
         <img id="page3" src="eea/page3.jpg">
+        <img id="zoom-in-img" src="eea/zoom-in.png">
+        <img id="zoom-out-img" src="eea/zoom-out.png">
       </a-assets>
 
       <a-marker
@@ -37,12 +39,13 @@
         cursor="fuse: false; rayOrigin: mouse;"
         gesture-handler
       >
-        <!-- 模型 -->
+        <!-- 模型 (初始縮小為0.5倍) -->
         <a-entity
           id="bowser-model"
           gltf-model="#animated-asset"
           animation-mixer="loop: repeat"
-          scale="1 1 1"
+          scale="0.5 0.5 0.5"
+          gesture-handler="minScale: 0.2; maxScale: 2"
           class="clickable"
         ></a-entity>
 
@@ -91,6 +94,25 @@
           position="0.8 1.5 -1"
           width="0.2"
           height="0.2"
+          class="clickable"
+        ></a-image>
+
+        <!-- 縮放控制按鈕 -->
+        <a-image
+          id="zoom-in-button"
+          src="#zoom-in-img"
+          position="0.8 1.8 -1"
+          width="0.15"
+          height="0.15"
+          class="clickable"
+        ></a-image>
+
+        <a-image
+          id="zoom-out-button"
+          src="#zoom-out-img"
+          position="0.8 2.0 -1"
+          width="0.15"
+          height="0.15"
           class="clickable"
         ></a-image>
       </a-marker>
@@ -172,6 +194,32 @@
 
       document.querySelector('#next-button').addEventListener('click', () => {
         updateBookPage(1);
+      });
+
+      // 模型縮放控制
+      const model = document.querySelector('#bowser-model');
+      const ZOOM_FACTOR = 0.1;
+      const MIN_SCALE = 0.2;
+      const MAX_SCALE = 2.0;
+
+      document.querySelector('#zoom-in-button').addEventListener('click', () => {
+        const currentScale = model.getAttribute('scale');
+        const newScale = {
+          x: Math.min(currentScale.x + ZOOM_FACTOR, MAX_SCALE),
+          y: Math.min(currentScale.y + ZOOM_FACTOR, MAX_SCALE),
+          z: Math.min(currentScale.z + ZOOM_FACTOR, MAX_SCALE)
+        };
+        model.setAttribute('scale', newScale);
+      });
+
+      document.querySelector('#zoom-out-button').addEventListener('click', () => {
+        const currentScale = model.getAttribute('scale');
+        const newScale = {
+          x: Math.max(currentScale.x - ZOOM_FACTOR, MIN_SCALE),
+          y: Math.max(currentScale.y - ZOOM_FACTOR, MIN_SCALE),
+          z: Math.max(currentScale.z - ZOOM_FACTOR, MIN_SCALE)
+        };
+        model.setAttribute('scale', newScale);
       });
 
       // 影片控制
