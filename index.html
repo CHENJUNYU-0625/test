@@ -10,7 +10,27 @@
   </head>
 
   <body style="margin: 0; overflow: hidden;">
+    <!-- 啟動畫面 -->
+    <div id="start-screen" style="
+      position: absolute;
+      width: 100vw;
+      height: 100vh;
+      background: linear-gradient(to bottom, #111, #222);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2em;
+      z-index: 10;
+      cursor: pointer;
+    ">
+      🚀 點擊啟動 AR 電子書
+    </div>
+
+    <!-- AR 場景 -->
     <a-scene
+      id="scene"
+      style="display: none;"
       vr-mode-ui="enabled: false"
       loading-screen="enabled: false"
       renderer="logarithmicDepthBuffer: true;"
@@ -80,20 +100,61 @@
         </a-entity>
 
         <!-- 翻頁按鈕 -->
-        <a-image id="prev-button" src="eea/left-arrow.png" position="-0.8 1.5 -0.95" width="0.2" height="0.2" transparent="true" class="clickable"></a-image>
-        <a-image id="next-button" src="eea/right-arrow.png" position="0.8 1.5 -0.95" width="0.2" height="0.2" transparent="true" class="clickable"></a-image>
+        <a-image
+          id="prev-button"
+          src="eea/left-arrow.png"
+          position="-0.8 1.5 -1"
+          width="0.2"
+          height="0.2"
+          class="clickable"
+        ></a-image>
 
-        <!-- 縮放按鈕 -->
-        <a-image id="zoom-in-button" src="#zoom-in-img" position="0.8 1.8 -0.95" width="0.15" height="0.15" transparent="true" class="clickable"></a-image>
-        <a-image id="zoom-out-button" src="#zoom-out-img" position="0.8 2.0 -0.95" width="0.15" height="0.15" transparent="true" class="clickable"></a-image>
+        <a-image
+          id="next-button"
+          src="eea/right-arrow.png"
+          position="0.8 1.5 -1"
+          width="0.2"
+          height="0.2"
+          class="clickable"
+        ></a-image>
 
-        <!-- 相機（移至 marker 內）-->
-        <a-entity camera position="0 0 0" cursor="rayOrigin: mouse" raycaster="objects: .clickable; far: 10"></a-entity>
+        <!-- 縮放控制按鈕 -->
+        <a-image
+          id="zoom-in-button"
+          src="#zoom-in-img"
+          position="0.8 1.8 -1"
+          width="0.15"
+          height="0.15"
+          class="clickable"
+        ></a-image>
+
+        <a-image
+          id="zoom-out-button"
+          src="#zoom-out-img"
+          position="0.8 2.0 -1"
+          width="0.15"
+          height="0.15"
+          class="clickable"
+        ></a-image>
       </a-marker>
+
+      <a-entity camera cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
     </a-scene>
 
     <script>
-      document.querySelector('a-scene').addEventListener('loaded', function() {
+      // 啟動 AR 的初始化：顯示場景並開始載入
+      function startAR() {
+        document.getElementById('start-screen').style.display = 'none';
+        document.getElementById('scene').style.display = 'block';
+      }
+
+      // 等待 DOM 準備好後綁定點擊事件
+      window.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('start-screen').addEventListener('click', startAR);
+      });
+
+      // 等待 A-Frame Scene 載入後開始初始化功能
+      document.querySelector('a-scene').addEventListener('loaded', function () {
         initApp();
       });
 
@@ -106,10 +167,13 @@
         function updateBookPage(direction) {
           if (isAnimating) return;
           isAnimating = true;
+
           const frontPage = document.querySelector("#book-page-front");
           const backPage = document.querySelector("#book-page-back");
+
           const nextPage = (currentPage + direction + pages.length) % pages.length;
           backPage.setAttribute('material', 'src', pages[nextPage]);
+
           const duration = 500;
 
           if (flipSound) {
@@ -119,6 +183,7 @@
 
           frontPage.removeAttribute('animation');
           backPage.removeAttribute('animation');
+
           frontPage.setAttribute('animation__flip', {
             property: 'rotation',
             to: `0 ${direction > 0 ? 180 : -180} 0`,
@@ -128,6 +193,7 @@
 
           setTimeout(() => {
             backPage.setAttribute('visible', 'true');
+
             backPage.setAttribute('animation__flip', {
               property: 'rotation',
               from: `0 ${direction > 0 ? -180 : 180} 0`,
@@ -142,6 +208,7 @@
               backPage.setAttribute('visible', 'false');
               backPage.removeAttribute('animation__flip');
               frontPage.removeAttribute('animation__flip');
+
               currentPage = nextPage;
               isAnimating = false;
             }, duration);
@@ -149,37 +216,42 @@
         }
 
         function setupButtonListeners() {
-          const buttons = [
-            ['#prev-button', () => updateBookPage(-1)],
-            ['#next-button', () => updateBookPage(1)],
-            ['#zoom-in-button', () => zoomModel(0.1)],
-            ['#zoom-out-button', () => zoomModel(-0.1)]
-          ];
+          document.querySelector('#prev-button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            updateBookPage(-1);
+          });
+
+          document.querySelector('#next-button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            updateBookPage(1);
+          });
 
           const model = document.querySelector('#bowser-model');
-          const MIN_SCALE = 0.2, MAX_SCALE = 2.0;
+          const ZOOM_FACTOR = 0.1;
+          const MIN_SCALE = 0.2;
+          const MAX_SCALE = 2.0;
 
-          function zoomModel(delta) {
-            const scale = model.getAttribute('scale');
+          document.querySelector('#zoom-in-button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentScale = model.getAttribute('scale');
             const newScale = {
-              x: Math.min(Math.max(scale.x + delta, MIN_SCALE), MAX_SCALE),
-              y: Math.min(Math.max(scale.y + delta, MIN_SCALE), MAX_SCALE),
-              z: Math.min(Math.max(scale.z + delta, MIN_SCALE), MAX_SCALE)
+              x: Math.min(currentScale.x + ZOOM_FACTOR, MAX_SCALE),
+              y: Math.min(currentScale.y + ZOOM_FACTOR, MAX_SCALE),
+              z: Math.min(currentScale.z + ZOOM_FACTOR, MAX_SCALE)
             };
             model.setAttribute('scale', newScale);
-          }
+          });
 
-          for (const [selector, handler] of buttons) {
-            const el = document.querySelector(selector);
-            el.addEventListener('click', (e) => {
-              e.stopPropagation();
-              handler();
-            });
-            el.addEventListener('touchend', (e) => {
-              e.stopPropagation();
-              handler();
-            });
-          }
+          document.querySelector('#zoom-out-button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentScale = model.getAttribute('scale');
+            const newScale = {
+              x: Math.max(currentScale.x - ZOOM_FACTOR, MIN_SCALE),
+              y: Math.max(currentScale.y - ZOOM_FACTOR, MIN_SCALE),
+              z: Math.max(currentScale.z - ZOOM_FACTOR, MIN_SCALE)
+            };
+            model.setAttribute('scale', newScale);
+          });
         }
 
         const marker = document.querySelector('#animated-marker');
@@ -191,6 +263,7 @@
             video.play().catch(e => console.log("Video play failed:", e));
             video.muted = false;
           }
+
           document.querySelector('#book-page-front').setAttribute('rotation', '0 0 0');
           document.querySelector('#book-page-back').setAttribute('visible', 'false');
         });
@@ -204,7 +277,10 @@
           }
         });
 
-        let touchStartX = 0, touchEndX = 0, touchStartTime = 0;
+        let touchStartX = 0;
+        let touchEndX = 0;
+        let touchStartTime = 0;
+
         const sceneEl = document.querySelector('a-scene');
 
         sceneEl.addEventListener('touchstart', function (e) {
@@ -216,15 +292,22 @@
         sceneEl.addEventListener('touchend', function (e) {
           touchEndX = e.changedTouches[0].screenX;
           const deltaTime = Date.now() - touchStartTime;
-          if (deltaTime < 500) handleSwipeGesture();
+
+          if (deltaTime < 500) {
+            handleSwipeGesture();
+          }
           e.preventDefault();
         }, { passive: false });
 
         function handleSwipeGesture() {
           const deltaX = touchEndX - touchStartX;
           if (Math.abs(deltaX) < 50) return;
-          if (deltaX < 0) updateBookPage(1);
-          else updateBookPage(-1);
+
+          if (deltaX < 0) {
+            updateBookPage(1);
+          } else {
+            updateBookPage(-1);
+          }
         }
 
         setupButtonListeners();
