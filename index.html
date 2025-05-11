@@ -18,7 +18,7 @@
       arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
       gesture-detector
     >
-      <a-assets timeout="10000">
+      <a-assets timeout="30000">
         <a-asset-item id="animated-asset" src="eea/asset.glb"></a-asset-item>
         <video id="ding-video" src="eea/ding.mp4" preload="auto" muted></video>
         <audio id="page-flip-sound" src="eea/page-flip.mp3" preload="auto"></audio>
@@ -55,7 +55,7 @@
           src="#ding-video"
           position="0 0.5 -0.5"
           scale="1 1 1"
-          autoplay
+          autoplay="false"
           muted
         ></a-video>
 
@@ -65,7 +65,7 @@
             id="book-page-front"
             width="1.2"
             height="0.9"
-            material="src: #cover"
+            material="src: #cover; side: double"
             class="clickable"
           ></a-plane>
           <a-plane
@@ -74,6 +74,7 @@
             height="0.9"
             rotation="0 180 0"
             visible="false"
+            material="side: double"
             class="clickable"
           ></a-plane>
         </a-entity>
@@ -121,153 +122,184 @@
     </a-scene>
 
     <script>
-      const pages = [
-        '#cover',
-        '#page2',
-        '#page3'
-      ];
-      let currentPage = 0;
-      const flipSound = document.querySelector('#page-flip-sound');
-      let isAnimating = false;
+      // 確保所有資源載入完成
+      document.querySelector('a-scene').addEventListener('loaded', function() {
+        initApp();
+      });
 
-      function updateBookPage(direction) {
-        if (isAnimating) return;
-        isAnimating = true;
-        
-        const frontPage = document.querySelector("#book-page-front");
-        const backPage = document.querySelector("#book-page-back");
-        
-        // 設置背面頁面的內容
-        const nextPage = (currentPage + direction + pages.length) % pages.length;
-        backPage.setAttribute('material', 'src', pages[nextPage]);
-        
-        // 動畫參數
-        const duration = 500;
-        const halfDuration = duration / 2;
-        
-        // 播放翻頁音效
-        if (flipSound) {
-          flipSound.currentTime = 0;
-          flipSound.play();
-        }
-        
-        // 第一步：翻轉前頁
-        frontPage.setAttribute('animation', {
-          property: 'rotation',
-          to: `0 ${direction > 0 ? 180 : -180} 0`,
-          dur: halfDuration,
-          easing: 'easeOutQuad'
-        });
-        
-        // 顯示背面頁面
-        setTimeout(() => {
-          backPage.setAttribute('visible', 'true');
+      function initApp() {
+        const pages = [
+          '#cover',
+          '#page2',
+          '#page3'
+        ];
+        let currentPage = 0;
+        const flipSound = document.querySelector('#page-flip-sound');
+        let isAnimating = false;
+
+        // 改進的翻頁函數
+        function updateBookPage(direction) {
+          if (isAnimating) return;
+          isAnimating = true;
           
-          // 第二步：翻轉後頁
-          backPage.setAttribute('animation', {
+          const frontPage = document.querySelector("#book-page-front");
+          const backPage = document.querySelector("#book-page-back");
+          
+          // 設置背面頁面的內容
+          const nextPage = (currentPage + direction + pages.length) % pages.length;
+          backPage.setAttribute('material', 'src', pages[nextPage]);
+          
+          // 動畫參數
+          const duration = 500;
+          
+          // 播放翻頁音效
+          if (flipSound) {
+            flipSound.currentTime = 0;
+            flipSound.play().catch(e => console.log("Audio play failed:", e));
+          }
+          
+          // 清除舊動畫
+          frontPage.removeAttribute('animation');
+          backPage.removeAttribute('animation');
+          
+          // 第一步：翻轉前頁
+          frontPage.setAttribute('animation__flip', {
             property: 'rotation',
-            from: `0 ${direction > 0 ? -180 : 180} 0`,
-            to: '0 0 0',
-            dur: halfDuration,
-            easing: 'easeInQuad'
+            to: `0 ${direction > 0 ? 180 : -180} 0`,
+            dur: duration,
+            easing: 'easeOutQuad'
           });
           
-          // 動畫完成後交換頁面
+          // 顯示背面頁面
           setTimeout(() => {
-            // 交換前後頁面
-            frontPage.setAttribute('material', 'src', pages[nextPage]);
-            frontPage.setAttribute('rotation', '0 0 0');
-            backPage.setAttribute('visible', 'false');
-            backPage.removeAttribute('animation');
-            frontPage.removeAttribute('animation');
+            backPage.setAttribute('visible', 'true');
             
-            currentPage = nextPage;
-            isAnimating = false;
-          }, halfDuration);
-        }, halfDuration);
-      }
+            // 第二步：翻轉後頁
+            backPage.setAttribute('animation__flip', {
+              property: 'rotation',
+              from: `0 ${direction > 0 ? -180 : 180} 0`,
+              to: '0 0 0',
+              dur: duration,
+              easing: 'easeInQuad'
+            });
+            
+            // 動畫完成後交換頁面
+            setTimeout(() => {
+              frontPage.setAttribute('material', 'src', pages[nextPage]);
+              frontPage.setAttribute('rotation', '0 0 0');
+              backPage.setAttribute('visible', 'false');
+              backPage.removeAttribute('animation__flip');
+              frontPage.removeAttribute('animation__flip');
+              
+              currentPage = nextPage;
+              isAnimating = false;
+            }, duration);
+          }, duration/2);
+        }
 
-      // 按鈕翻頁
-      document.querySelector('#prev-button').addEventListener('click', () => {
-        updateBookPage(-1);
-      });
+        // 按鈕翻頁 - 改進事件監聽
+        function setupButtonListeners() {
+          document.querySelector('#prev-button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            updateBookPage(-1);
+          });
 
-      document.querySelector('#next-button').addEventListener('click', () => {
-        updateBookPage(1);
-      });
+          document.querySelector('#next-button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            updateBookPage(1);
+          });
 
-      // 模型縮放控制
-      const model = document.querySelector('#bowser-model');
-      const ZOOM_FACTOR = 0.1;
-      const MIN_SCALE = 0.2;
-      const MAX_SCALE = 2.0;
+          // 模型縮放控制
+          const model = document.querySelector('#bowser-model');
+          const ZOOM_FACTOR = 0.1;
+          const MIN_SCALE = 0.2;
+          const MAX_SCALE = 2.0;
 
-      document.querySelector('#zoom-in-button').addEventListener('click', () => {
-        const currentScale = model.getAttribute('scale');
-        const newScale = {
-          x: Math.min(currentScale.x + ZOOM_FACTOR, MAX_SCALE),
-          y: Math.min(currentScale.y + ZOOM_FACTOR, MAX_SCALE),
-          z: Math.min(currentScale.z + ZOOM_FACTOR, MAX_SCALE)
-        };
-        model.setAttribute('scale', newScale);
-      });
+          document.querySelector('#zoom-in-button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentScale = model.getAttribute('scale');
+            const newScale = {
+              x: Math.min(currentScale.x + ZOOM_FACTOR, MAX_SCALE),
+              y: Math.min(currentScale.y + ZOOM_FACTOR, MAX_SCALE),
+              z: Math.min(currentScale.z + ZOOM_FACTOR, MAX_SCALE)
+            };
+            model.setAttribute('scale', newScale);
+          });
 
-      document.querySelector('#zoom-out-button').addEventListener('click', () => {
-        const currentScale = model.getAttribute('scale');
-        const newScale = {
-          x: Math.max(currentScale.x - ZOOM_FACTOR, MIN_SCALE),
-          y: Math.max(currentScale.y - ZOOM_FACTOR, MIN_SCALE),
-          z: Math.max(currentScale.z - ZOOM_FACTOR, MIN_SCALE)
-        };
-        model.setAttribute('scale', newScale);
-      });
+          document.querySelector('#zoom-out-button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentScale = model.getAttribute('scale');
+            const newScale = {
+              x: Math.max(currentScale.x - ZOOM_FACTOR, MIN_SCALE),
+              y: Math.max(currentScale.y - ZOOM_FACTOR, MIN_SCALE),
+              z: Math.max(currentScale.z - ZOOM_FACTOR, MIN_SCALE)
+            };
+            model.setAttribute('scale', newScale);
+          });
+        }
 
-      // 影片控制
-      const marker = document.querySelector('#animated-marker');
-      marker.addEventListener('markerFound', () => {
+        // 影片控制 - 改進標記偵測
+        const marker = document.querySelector('#animated-marker');
         const video = document.querySelector('#ding-video');
-        if (video) {
-          video.play();
-          video.muted = false;
+        
+        marker.addEventListener('markerFound', () => {
+          console.log("Marker found");
+          if (video) {
+            video.play().catch(e => console.log("Video play failed:", e));
+            video.muted = false;
+          }
+          
+          // 重置所有元素狀態
+          document.querySelector('#book-page-front').setAttribute('rotation', '0 0 0');
+          document.querySelector('#book-page-back').setAttribute('visible', 'false');
+        });
+
+        marker.addEventListener('markerLost', () => {
+          console.log("Marker lost");
+          if (video) {
+            video.pause();
+            video.currentTime = 0;
+            video.muted = true;
+          }
+        });
+
+        // 觸控滑動支援 - 改進手勢檢測
+        let touchStartX = 0;
+        let touchEndX = 0;
+        let touchStartTime = 0;
+
+        const sceneEl = document.querySelector('a-scene');
+
+        sceneEl.addEventListener('touchstart', function (e) {
+          touchStartX = e.changedTouches[0].screenX;
+          touchStartTime = Date.now();
+          e.preventDefault();
+        }, {passive: false});
+
+        sceneEl.addEventListener('touchend', function (e) {
+          touchEndX = e.changedTouches[0].screenX;
+          const deltaTime = Date.now() - touchStartTime;
+          
+          if (deltaTime < 500) { // 只處理短時間內的滑動
+            handleSwipeGesture();
+          }
+          e.preventDefault();
+        }, {passive: false});
+
+        function handleSwipeGesture() {
+          const deltaX = touchEndX - touchStartX;
+
+          if (Math.abs(deltaX) < 50) return; // 增加最小滑動距離
+
+          if (deltaX < 0) {
+            updateBookPage(1); // 向左滑動 → 下一頁
+          } else {
+            updateBookPage(-1); // 向右滑動 → 上一頁
+          }
         }
-      });
 
-      marker.addEventListener('markerLost', () => {
-        const video = document.querySelector('#ding-video');
-        if (video) {
-          video.pause();
-          video.currentTime = 0;
-          video.muted = true;
-        }
-      });
-
-      // 觸控滑動支援
-      let touchStartX = 0;
-      let touchEndX = 0;
-
-      const sceneEl = document.querySelector('a-scene');
-
-      sceneEl.addEventListener('touchstart', function (e) {
-        touchStartX = e.changedTouches[0].screenX;
-      });
-
-      sceneEl.addEventListener('touchend', function (e) {
-        touchEndX = e.changedTouches[0].screenX;
-        handleSwipeGesture();
-      });
-
-      function handleSwipeGesture() {
-        const deltaX = touchEndX - touchStartX;
-
-        if (Math.abs(deltaX) < 30) return; // 忽略太短的滑動
-
-        if (deltaX < 0) {
-          // 向左滑動 → 下一頁
-          updateBookPage(1);
-        } else {
-          // 向右滑動 → 上一頁
-          updateBookPage(-1);
-        }
+        // 初始化按鈕監聽
+        setupButtonListeners();
       }
     </script>
   </body>
