@@ -3,7 +3,6 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!-- 禁用不必要的權限請求 -->
     <meta name="vr-mode" content="no-vr-mode">
     <meta name="ar" content="no-ar">
     <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
@@ -11,9 +10,38 @@
     <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
     <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
+    <style>
+      .zoom-controls {
+        position: absolute;
+        right: 20px;
+        top: 20px;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .zoom-btn {
+        width: 40px;
+        height: 40px;
+        background: rgba(255,255,255,0.7);
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 24px;
+        cursor: pointer;
+        user-select: none;
+      }
+    </style>
   </head>
 
   <body style="margin: 0; overflow: hidden;">
+    <!-- 新增HTML縮放控制按鈕 -->
+    <div class="zoom-controls">
+      <div id="zoom-in-btn" class="zoom-btn">+</div>
+      <div id="zoom-out-btn" class="zoom-btn">-</div>
+    </div>
+
     <a-scene
       vr-mode-ui="enabled: false"
       loading-screen="enabled: false"
@@ -30,9 +58,6 @@
         <img id="cover" src="eea/cover.jpg">
         <img id="page2" src="eea/page2.jpg">
         <img id="page3" src="eea/page3.jpg">
-        <!-- 新增縮放按鈕圖標 -->
-        <img id="zoom-in-icon" src="eea/zoom-in.png">
-        <img id="zoom-out-icon" src="eea/zoom-out.png">
       </a-assets>
 
       <a-marker
@@ -45,75 +70,21 @@
         cursor="fuse: false; rayOrigin: mouse;"
         gesture-handler
       >
-        <!-- 3D模型 (新增手勢縮放功能) -->
+        <!-- 3D模型 (初始縮小為0.3倍) -->
         <a-entity
           id="bowser-model"
           gltf-model="#animated-asset"
           animation-mixer="loop: repeat"
-          scale="0.5 0.5 0.5"
-          gesture-handler="minScale: 0.3; maxScale: 2"
+          scale="0.3 0.3 0.3"
+          gesture-handler="minScale: 0.1; maxScale: 3"
           class="clickable"
         ></a-entity>
 
-        <!-- 影片 -->
-        <a-video
-          id="video-entity"
-          src="#ding-video"
-          position="0 0.5 -0.5"
-          scale="1 1 1"
-          autoplay="false"
-          muted
-        ></a-video>
-
-        <!-- 電子書頁面 -->
-        <a-plane
-          id="book-page"
-          position="0 1.5 -1"
-          width="1.2"
-          height="0.9"
-          rotation="0 0 0"
-          material="src: #cover; side: double"
-          class="clickable"
-          animation__flip="property: rotation; dur: 500; startEvents: flip; from: 0 0 0; to: 0 180 0"
-        ></a-plane>
-
-        <!-- 翻頁按鈕 -->
-        <a-image
-          id="prev-button"
-          src="eea/left-arrow.png"
-          position="-0.8 1.5 -1"
-          width="0.2"
-          height="0.2"
-          class="clickable"
-        ></a-image>
-
-        <a-image
-          id="next-button"
-          src="eea/right-arrow.png"
-          position="0.8 1.5 -1"
-          width="0.2"
-          height="0.2"
-          class="clickable"
-        ></a-image>
-
-        <!-- 新增縮放控制按鈕 -->
-        <a-image
-          id="zoom-in-button"
-          src="#zoom-in-icon"
-          position="0.8 1.8 -1"
-          width="0.15"
-          height="0.15"
-          class="clickable"
-        ></a-image>
-
-        <a-image
-          id="zoom-out-button"
-          src="#zoom-out-icon"
-          position="0.8 2.0 -1"
-          width="0.15"
-          height="0.15"
-          class="clickable"
-        ></a-image>
+        <!-- 其他元素保持不變 -->
+        <a-video id="video-entity" src="#ding-video" position="0 0.5 -0.5" scale="1 1 1" autoplay="false" muted></a-video>
+        <a-plane id="book-page" position="0 1.5 -1" width="1.2" height="0.9" rotation="0 0 0" material="src: #cover; side: double" class="clickable"></a-plane>
+        <a-image id="prev-button" src="eea/left-arrow.png" position="-0.8 1.5 -1" width="0.2" height="0.2" class="clickable"></a-image>
+        <a-image id="next-button" src="eea/right-arrow.png" position="0.8 1.5 -1" width="0.2" height="0.2" class="clickable"></a-image>
       </a-marker>
 
       <a-entity camera cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
@@ -126,16 +97,32 @@
         const flipSound = document.querySelector('#page-flip-sound');
         const model = document.querySelector('#bowser-model');
 
-        // 模型縮放參數
+        // 縮放控制參數
         const ZOOM_FACTOR = 0.1;
-        const MIN_SCALE = 0.3;
-        const MAX_SCALE = 2.0;
+        const MIN_SCALE = 0.1;
+        const MAX_SCALE = 3.0;
+        let currentScale = 0.3; // 初始縮放值
 
+        // 初始化模型縮放
+        model.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+
+        // 翻頁功能
         function updateBookPage() {
           const page = document.querySelector("#book-page");
           if (page) {
             page.setAttribute('material', 'src', pages[currentPage]);
-            page.emit('flip');
+            // 添加翻頁動畫
+            page.setAttribute('animation', {
+              property: 'rotation',
+              from: '0 0 0',
+              to: '0 180 0',
+              dur: 500,
+              easing: 'easeInOutQuad'
+            });
+            setTimeout(() => {
+              page.setAttribute('rotation', '0 0 0');
+              page.removeAttribute('animation');
+            }, 500);
           }
           if (flipSound) {
             flipSound.currentTime = 0;
@@ -143,7 +130,7 @@
           }
         }
 
-        // 按鈕翻頁
+        // 翻頁按鈕
         document.querySelector('#prev-button').addEventListener('click', (e) => {
           e.stopPropagation();
           currentPage = (currentPage - 1 + pages.length) % pages.length;
@@ -156,27 +143,15 @@
           updateBookPage();
         });
 
-        // 新增模型縮放控制
-        document.querySelector('#zoom-in-button').addEventListener('click', (e) => {
-          e.stopPropagation();
-          const currentScale = model.getAttribute('scale');
-          const newScale = {
-            x: Math.min(currentScale.x + ZOOM_FACTOR, MAX_SCALE),
-            y: Math.min(currentScale.y + ZOOM_FACTOR, MAX_SCALE),
-            z: Math.min(currentScale.z + ZOOM_FACTOR, MAX_SCALE)
-          };
-          model.setAttribute('scale', newScale);
+        // 縮放控制功能
+        document.querySelector('#zoom-in-btn').addEventListener('click', () => {
+          currentScale = Math.min(currentScale + ZOOM_FACTOR, MAX_SCALE);
+          model.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
         });
 
-        document.querySelector('#zoom-out-button').addEventListener('click', (e) => {
-          e.stopPropagation();
-          const currentScale = model.getAttribute('scale');
-          const newScale = {
-            x: Math.max(currentScale.x - ZOOM_FACTOR, MIN_SCALE),
-            y: Math.max(currentScale.y - ZOOM_FACTOR, MIN_SCALE),
-            z: Math.max(currentScale.z - ZOOM_FACTOR, MIN_SCALE)
-          };
-          model.setAttribute('scale', newScale);
+        document.querySelector('#zoom-out-btn').addEventListener('click', () => {
+          currentScale = Math.max(currentScale - ZOOM_FACTOR, MIN_SCALE);
+          model.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
         });
 
         // 影片控制
